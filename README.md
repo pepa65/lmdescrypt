@@ -1,7 +1,7 @@
 # lmdecrypt
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
-or Linux Mint Debian Edition version 2 (201504) to be
+or Linux Mint Debian Edition version 2 (201504) to be:
 *Fully luks encrypted, with lvm2 volumes of root, swap and (optionally) data*
 
 Github page: https://github.com/pepa65/lmdecrypt
@@ -11,7 +11,6 @@ See forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
 
 Shortlink to download the script: http://j.mp/lmdecrypt
 Questions?  solusos@passchier.net or post an Issue on the github page
-
 
 ## INSTRUCTIONS
 
