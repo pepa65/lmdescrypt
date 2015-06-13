@@ -339,7 +339,6 @@ cat <<-END >"$target/etc/fstab"
 END
 ((data_gb)) && echo "$data_device /$data_label $format_data relatime 0 2" >>"$target/etc/fstab"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
-sed 's/debian.linuxmint.com/mirrors.xmission.com\/linuxmint-debian/g' /etc/apt/sources.list.d/official-package-repositories.list >"$target/etc/apt/sources.list.d/official-package-repositories.list"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
 echo $hostname >"$target/etc/hostname"
@@ -348,7 +347,7 @@ rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$0" "$target/root"
 mount --bind /dev "$target/dev"
-chroot "$target" "/root/$(basename $0)" inside $username $grub_device $packages
+chroot "$target" "/root/$(basename $0) inside $username $grub_device $packages"
 
 Unmountall
 echo -e "\n  Ready for reboot!\n"
