@@ -1,5 +1,6 @@
 #!/bin/bash
 set -o xtrace -o verbose -o errexit -o errtrace
+############################################################################
 #
 #  lmdescrypt
 #
@@ -103,13 +104,16 @@ swap_size=DEFAULT
 data_size=0
 
 ### Adjust If reusing preexisting boot or data volumes
-## Indicate which ones (apart from root) need formatting by putting 1 (otherwise 0):
-format_boot=1
-format_swap=1
-format_data=1
+##  root will always be formatted; swap will always be swap if formatted
+## Indicate which ones (apart from root) need formatting by putting the desires filesystem (otherwise empty):
+format_boot=ext2
+format_root=ext4
+format_swap=swap
+format_data=ext4
 
 ### No need to adjust; according to preference
 ## The crypt_label will also be used as the Volumegroup-name, and it will be pre-erased!
+## The data_label will also be the name of the mountpoint
 ## Specify the filesystem labels (no spaces):
 crypt_label=crypt
 boot_label=boot
@@ -150,7 +154,7 @@ Rechroot(){
 	mkdir -p "$target/boot"
 	mount "$boot_device" "$target/boot"
 	((data_size)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
-	df -hlTt ext2 -t ext4
+	df -hlT -t "$format_boot" -t "$format_root" -t "$format_data"
 	mount --bind /dev "$target/dev"
 	chroot "$target"
 	Mountinside
@@ -183,7 +187,7 @@ Unmountall(){
 Inside(){ # 1:$username 2:$grub_device $packages
 	username=$1 grub_device="$2"
 	shift 2
-	packages="$@"
+	packages="$*"
 	Mountinside
 	locale-gen
 	useradd -ms /bin/bash $username
@@ -230,7 +234,7 @@ case $1 in
 	inside)
 		((inside)) || Exit "Invalid call 'inside', not in chroot: $0 $*"
 		shift
-		Inside "$@"
+		Inside "$*"
 		exit 0 ;;
 	rechroot)
 		((inside)) && Exit "Invalid call 'rechroot', not in live environment: $0 $*"
@@ -266,8 +270,8 @@ swap_gb=0
 ((swap_size)) && swap_gb=$swap_size && lvmswap="-L ${swap_gb}G -Cy -Zn"
 [[ $swap_size = DEFAULT ]] && swap_gb=1 && lvmswap="-L $(($(head -1 /proc/meminfo |sed 's/[^0-9]//g')+100000))K -Cy -Zn"
 
-((force_486)) && packages+=' linux-image-486' || packages+=" linux-image-$(uname -r)"
 ((force_random)) && force_reencrypt=1
+packages+=" linux-image-$(uname -r)"
 
 ############################################################################
 #### MAIN
@@ -299,19 +303,20 @@ vgcreate $crypt_label /dev/mapper/$crypt_label
 if ((swap_gb))
 then
 	lvcreate $lvmswap -n $swap_label $crypt_label
-	((format_swap)) && mkswap -f -L $swap_label "$swap_device"
+	[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
 	swap_uuid=$(blkid -s UUID -o value "$swap_device")
 fi
 if ((data_gb))
 then
 	lvcreate $lvmdata -n $data_label $crypt_label
-	((format_data)) && mkfs -F -t ext4 -j -m 0 -L $data_label "$data_device"
+	[[ $format_data ]] && mkfs -F -t "$format_data" -j -m 0 -L $data_label "$data_device"
 	data_uuid=$(blkid -s UUID -o value "$data_device")
 fi
 ((root_gb==1)) && lvcreate $lvmroot -n $root_label $crypt_label
-mkfs -F -t ext4 -j -L $root_label "$root_device"
+[[ $format_root ]] || format_root=ext4
+mkfs -F -t "$format_root" -j -L $root_label "$root_device"
 root_uuid=$(blkid -s UUID -o value "$root_device")
-((format_boot)) && mkfs -F -t ext2 -L $boot_label "$boot_device"
+[[ $format_boot ]] && mkfs -F -t "$format_boot" -L $boot_label "$boot_device"
 boot_uuid=$(blkid -s UUID -o value "$boot_device")
 
 ## Mount
@@ -322,7 +327,7 @@ mount "$root_device" "$target"
 mkdir -p "$target/boot"
 mount "$boot_device" "$target/boot"
 ((data_size)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
-df -hlTt ext2 -t ext4
+df -hlT -t "$format_boot" -t "$format_root" -t "$format_data"
 
 ## Copy
 cp -a "$sqroot"/* "$target"
@@ -331,10 +336,10 @@ cp -a "$sqroot"/* "$target"
 cat <<-END >"$target/etc/fstab"
 	proc /proc proc defaults 0 0
 	UUID=$swap_uuid $swap_label swap sw 0 0
-	UUID=$root_uuid / ext4 relatime,errors=remount-ro 0 1
-	UUID=$boot_uuid /boot ext2 relatime 0 2
+	UUID=$root_uuid / $format_root relatime,errors=remount-ro 0 1
+	UUID=$boot_uuid /boot $format_boot relatime 0 2
 END
-((data_size)) && echo "UUID=$data_uuid /$data_label ext4 relatime 0 2" >>"$target/etc/fstab"
+((data_size)) && echo "UUID=$data_uuid /$data_label $format_data relatime 0 2" >>"$target/etc/fstab"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed 's/debian.linuxmint.com/mirrors.xmission.com\/linuxmint-debian/g' /etc/apt/sources.list.d/official-package-repositories.list >"$target/etc/apt/sources.list.d/official-package-repositories.list"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
@@ -351,4 +356,3 @@ Unmountall
 echo -e "\n  Ready for reboot!\n"
 
 exit 0
-
