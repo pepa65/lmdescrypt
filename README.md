@@ -7,7 +7,9 @@ or Linux Mint Debian Edition version 2 (201504) to be:<br>
 Github page: https://github.com/pepa65/lmdescrypt
 
 It is based on this Makefile: http://j.mp/makelmde<br>
-See forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
+See forum topics:
+- http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
+- http://forums.linuxmint.com/viewtopic.php?f=241&t=194031
 
 Shortlink to download the script: http://j.mp/lmdescrypt<br>
 Questions?  solusos@passchier.net or post an Issue on the github page
