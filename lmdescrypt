@@ -154,7 +154,7 @@ Rechroot(){
 	mkdir -p "$target/boot"
 	mount "$boot_device" "$target/boot"
 	((data_size)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
-	df -hlT -t "$format_boot" -t "$format_root" -t "$format_data"
+	df --sync -hlT -x tmpfs -x devtmpfs
 	mount --bind /dev "$target/dev"
 	chroot "$target"
 	Mountinside
@@ -180,6 +180,8 @@ Unmountall(){
 	umount "$target"
 	((swap_gb)) && swapoff "$swap_device"
 	vgchange -an
+	sync
+	sleep 1
 	cryptsetup luksClose $crypt_label
 	sync
 }
@@ -222,12 +224,12 @@ Inside(){ # 1:$username 2:$grub_device $packages
 [[ $swap_label = "${swap_label/ /}" ]] || Exit "Label swap_label contains spaces: $swap_label"
 [[ $data_label = "${data_label/ /}" ]] || Exit "Label data_label contains spaces: $data_label"
 
-target=/target
+target='/target'
 root_device="/dev/mapper/$crypt_label-$root_label"
 data_device="/dev/mapper/$crypt_label-$data_label"
 swap_device="/dev/mapper/$crypt_label-$swap_label"
 
-sqroot=/lib/live/mount/rootfs/filesystem.squashfs
+sqroot='/lib/live/mount/rootfs/filesystem.squashfs'
 [[ -d "$sqroot" ]] && inside=0 || inside=1
 
 case $1 in
@@ -258,7 +260,7 @@ esac
 [[ $root_size = DEFAULT ]] && root_gb=20
 [[ $root_size = REST ]] && root_gb=1 && lvmroot='-l 100%FREE -Zn'
 ((root_gb)) || Exit "Unacceptable setting root_size: $root_size"
-((root_size>0 && root_size<6)) && Exit "Setting root_size too small: $root_size"
+((root_size!=0 && root_size<6)) && Exit "Setting root_size too small: $root_size"
 [[ $lvmroot ]] || lvmroot="-L ${root_gb}G -Zn"
 
 ((data_size)) && data_gb=$data_size && lvmdata="-L ${data_gb}G -Zn" || data_gb=0
@@ -293,13 +295,9 @@ crypt_uuid=$(blkid -s UUID -o value "$crypt_device")
 dmsetup status
 
 ## Make lvm2 volumes and format
-#pvscan
-#vgchange -ay
-#lvscan
 # If a volume with that label exists, nothing will happen
 grep \"$crypt_label\" <<<"$(vgscan)" && vgremove -f $crypt_label
 vgcreate $crypt_label /dev/mapper/$crypt_label
-((root_gb>1)) && lvcreate $lvmroot -n $root_label $crypt_label
 if ((swap_gb))
 then
 	lvcreate $lvmswap -n $swap_label $crypt_label
@@ -312,7 +310,7 @@ then
 	[[ $format_data ]] && mkfs -F -t "$format_data" -j -m 0 -L $data_label "$data_device"
 	data_uuid=$(blkid -s UUID -o value "$data_device")
 fi
-((root_gb==1)) && lvcreate $lvmroot -n $root_label $crypt_label
+((root_gb)) && lvcreate $lvmroot -n $root_label $crypt_label
 [[ $format_root ]] || format_root=ext4
 mkfs -F -t "$format_root" -j -L $root_label "$root_device"
 root_uuid=$(blkid -s UUID -o value "$root_device")
@@ -326,8 +324,8 @@ mkdir -p "$target"
 mount "$root_device" "$target"
 mkdir -p "$target/boot"
 mount "$boot_device" "$target/boot"
-((data_size)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
-df -hlT -t "$format_boot" -t "$format_root" -t "$format_data"
+((data_gb)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
+df --sync -hlT -x tmpfs -x devtmpfs
 
 ## Copy
 cp -a "$sqroot"/* "$target"
@@ -335,18 +333,18 @@ cp -a "$sqroot"/* "$target"
 ## Prepare root
 cat <<-END >"$target/etc/fstab"
 	proc /proc proc defaults 0 0
-	UUID=$swap_uuid $swap_label swap sw 0 0
-	UUID=$root_uuid / $format_root relatime,errors=remount-ro 0 1
+	$swap_device $swap_label swap sw 0 0
+	$root_device / $format_root relatime,errors=remount-ro 0 1
 	UUID=$boot_uuid /boot $format_boot relatime 0 2
 END
-((data_size)) && echo "UUID=$data_uuid /$data_label $format_data relatime 0 2" >>"$target/etc/fstab"
+((data_gb)) && echo "$data_device /$data_label $format_data relatime 0 2" >>"$target/etc/fstab"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed 's/debian.linuxmint.com/mirrors.xmission.com\/linuxmint-debian/g' /etc/apt/sources.list.d/official-package-repositories.list >"$target/etc/apt/sources.list.d/official-package-repositories.list"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
 echo $hostname >"$target/etc/hostname"
 echo "$LANG UTF-8" >>"$target/etc/locale.gen"
-rm "$target/etc/resolv.conf"  ## remove symlink
+rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$0" "$target/root"
 mount --bind /dev "$target/dev"
