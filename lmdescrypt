@@ -187,9 +187,10 @@ Unmountall(){
 }
 
 Inside(){ # 1:$username 2:$grub_device $packages
-	username=$1 grub_device="$2"
+	username=$1
+	grub_device=$2
 	shift 2
-	packages="$*"
+	packages=$*
 	Mountinside
 	locale-gen
 	useradd -ms /bin/bash $username
@@ -202,10 +203,10 @@ Inside(){ # 1:$username 2:$grub_device $packages
 	apt-get update
 	rm -f /initrd.img
 	[[ "$packages" ]] && apt-get --yes --force-yes --reinstall install $packages
-	apt-get --yes purge 'live-*'
+	apt-get --yes purge '^live-.*'
 	update-grub
 	grub-install --recheck --force "$grub_device"
-	rm -rf /lib/live
+	rm -rvf /lib/live
 	Unmountinside
 }
 
@@ -232,28 +233,33 @@ swap_device="/dev/mapper/$crypt_label-$swap_label"
 sqroot='/lib/live/mount/rootfs/filesystem.squashfs'
 [[ -d "$sqroot" ]] && inside=0 || inside=1
 
+self=$(basename $0)
 case $1 in
 	inside)
-		((inside)) || Exit "Invalid call 'inside', not in chroot: $0 $*"
+		((inside)) || Exit "Invalid call 'inside', not in chroot: $self $*"
 		shift
-		Inside "$*"
+		Inside $*
 		exit 0 ;;
 	rechroot)
-		((inside)) && Exit "Invalid call 'rechroot', not in live environment: $0 $*"
-		Rechroot ;;
+		((inside)) && Exit "Invalid call 'rechroot', not in live environment: $self $*"
+		Rechroot
+		exit 0 ;;
 	mountinside)
-		((inside)) || Exit "Invalid call 'mountinside', not in chroot: $0 $*"
-		Mountinside ;;
+		((inside)) || Exit "Invalid call 'mountinside', not in chroot: $self $*"
+		Mountinside
+		exit 0 ;;
 	unmountinside)
-		((inside)) || Exit "Invalid call 'unmountinside', not in chroot: $0 $*"
-		Unmountinside ;;
+		((inside)) || Exit "Invalid call 'unmountinside', not in chroot: $self $*"
+		Unmountinside
+		exit 0 ;;
 	unmountrest)
-		((inside)) && Exit "Invalid call 'unmountrest', not in live environment: $0 $*"
-		Unmountall ;;
+		((inside)) && Exit "Invalid call 'unmountrest', not in live environment: $self $*"
+		Unmountall
+		exit 0 ;;
 	'')
-		((inside)) && Exit "Invalid command $0, not in live environment" ;;
+		((inside)) && Exit "Invalid command $self, not in live environment" ;;
 	*)
-		Exit "Unknown first argument to $0: $*" ;;
+		Exit "Unknown first argument to $self: $*" ;;
 esac
 
 ((root_size)) && root_gb=$root_size
@@ -345,9 +351,9 @@ echo $hostname >"$target/etc/hostname"
 echo "$LANG UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
-cp "$0" "$target/root"
+cp "$self" "$target/root"
 mount --bind /dev "$target/dev"
-chroot "$target" "/root/$(basename $0) inside $username $grub_device $packages"
+chroot "$target" "/root/$self" inside $username $grub_device $packages
 
 Unmountall
 echo -e "\n  Ready for reboot!\n"
