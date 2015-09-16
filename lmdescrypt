@@ -233,11 +233,18 @@ root_device="/dev/mapper/$crypt_label-$root_label"
 data_device="/dev/mapper/$crypt_label-$data_label"
 swap_device="/dev/mapper/$crypt_label-$swap_label"
 
-rofs='/lib/live/mount/rootfs/filesystem.squashfs'
-[[ -d "$rofs" ]] || rofs='/rofs'  ## If not LMDE, then try regular Mint
-
-## Detect whether on Live system or not
-[[ -d /cdrom ]] && inside=0 || inside=1
+rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
+rofslm='/rofs'
+if [[ -d /lib/live ]]
+then  ## Debian Edition
+	rofs=$rofsde
+	## Detect whether on Live system or not
+	[[ -d /lib/live/mount ]] && inside=0 || inside=1
+else  ## regular Mint
+	rofs=$rofslm
+	## Detect whether on Live system or not
+	[[ -d /cdrom ]] && inside=0 || inside=1
+fi
 
 self=$(basename $0)
 case $1 in
