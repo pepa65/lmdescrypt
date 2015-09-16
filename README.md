@@ -1,7 +1,8 @@
 # lmdescrypt
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
-or Linux Mint Debian Edition version 2 (201504) to be:<br>
+or Linux Mint Debian Edition version 2 (201504)
+or regular Linux Mint 17.1 or 17.2 to be:<br>
 *Fully luks encrypted, with lvm2 volumes of root, swap and (optionally) data*
 
 Github page: https://github.com/pepa65/lmdescrypt
@@ -44,7 +45,7 @@ Within fdisk, enter the following:
  [Enter]
  [Enter]
  [Enter]
- +128M [Enter]
+ +200M [Enter]
  n [Enter]
  [Enter]
  [Enter]
@@ -52,7 +53,7 @@ Within fdisk, enter the following:
  [Enter]
  w [Enter]
 ```
-This is making a 128 MB boot partition, and giving the rest to the encrypted lvm2
+This is making a 200 MB boot partition, and giving the rest to the encrypted lvm2
 
 **5. Start the script:**
 

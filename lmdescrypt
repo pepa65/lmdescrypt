@@ -1,5 +1,5 @@
 #!/bin/bash
-set -o xtrace -o verbose -o errexit -o errtrace
+set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
 #  lmdescrypt
@@ -147,7 +147,9 @@ Exit(){	echo -e "  ERROR: $1\n  ABORTING"; exit 1;}
 
 Rechroot(){
 	cryptsetup luksOpen "$crypt_device" $crypt_label
+	sync
 	vgchange -ay
+	sync
 	swapon "$swap_device"
 	mkdir -p "$target"
 	mount "$root_device" "$target"
@@ -179,6 +181,7 @@ Unmountall(){
 	((data_gb)) && umount "$target/$data_label"
 	umount "$target"
 	((swap_gb)) && swapoff "$swap_device"
+	sync
 	vgchange -an
 	sync
 	sleep 1
@@ -230,8 +233,11 @@ root_device="/dev/mapper/$crypt_label-$root_label"
 data_device="/dev/mapper/$crypt_label-$data_label"
 swap_device="/dev/mapper/$crypt_label-$swap_label"
 
-sqroot='/lib/live/mount/rootfs/filesystem.squashfs'
-[[ -d "$sqroot" ]] && inside=0 || inside=1
+rofs='/lib/live/mount/rootfs/filesystem.squashfs'
+[[ -d "$rofs" ]] || rofs='/rofs'  ## If not LMDE, then try regular Mint
+
+## Detect whether on Live system or not
+[[ -d /cdrom ]] && inside=0 || inside=1
 
 self=$(basename $0)
 case $1 in
@@ -334,7 +340,7 @@ mount "$boot_device" "$target/boot"
 df --sync -hlT -x tmpfs -x devtmpfs
 
 ## Copy
-cp -a "$sqroot"/* "$target"
+cp -a "$rofs"/* "$target"
 
 ## Prepare root
 cat <<-END >"$target/etc/fstab"
