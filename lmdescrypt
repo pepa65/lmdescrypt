@@ -280,7 +280,8 @@ esac
 
 ((root_size)) && root_gb=$root_size
 [[ $root_size = DEFAULT ]] && root_gb=20
-[[ $root_size = REST ]] && root_gb=1 && lvmroot='-l 100%FREE -Zn'
+rootfirst=0
+[[ $root_size = REST ]] && root_gb=1 && rootfirst=1 && lvmroot='-l 100%FREE -Zn'
 ((root_gb)) || Exit "Unacceptable setting root_size: $root_size"
 ((root_size!=0 && root_size<6)) && Exit "Setting root_size too small: $root_size"
 [[ $lvmroot ]] || lvmroot="-L ${root_gb}G -Zn"
@@ -326,13 +327,15 @@ then
 	[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
 	swap_uuid=$(blkid -s UUID -o value "$swap_device")
 fi
+
+((rootfirst)) && ((root_gb)) && lvcreate $lvmroot -n $root_label $crypt_label
 if ((data_gb))
 then
 	lvcreate $lvmdata -n $data_label $crypt_label
 	[[ $format_data ]] && mkfs -F -t "$format_data" -j -m 0 -L $data_label "$data_device"
 	data_uuid=$(blkid -s UUID -o value "$data_device")
 fi
-((root_gb)) && lvcreate $lvmroot -n $root_label $crypt_label
+((rootfirst==0)) && ((root_gb)) && lvcreate $lvmroot -n $root_label $crypt_label
 [[ $format_root ]] || format_root=ext4
 mkfs -F -t "$format_root" -j -L $root_label "$root_device"
 root_uuid=$(blkid -s UUID -o value "$root_device")
