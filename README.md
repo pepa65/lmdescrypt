@@ -2,7 +2,7 @@
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504)
-or regular Linux Mint 17.1 or 17.2 to be:<br>
+or regular Linux Mint 17.1 or 17.2 or 17.3 to be:<br>
 *Fully luks encrypted, with lvm2 volumes of root, swap and (optionally) data*
 
 Github page: https://github.com/pepa65/lmdescrypt
@@ -17,7 +17,7 @@ Questions?  solusos@passchier.net or post an Issue on the github page
 
 ## INSTRUCTIONS
 
-**1. Boot the Live environment of LMDE 201403 or LMDE-2**
+**1. Boot the Live environment**
 
 **2. Open a Terminal (Menu, Terminal) and enter:**
 
@@ -45,7 +45,7 @@ Within fdisk, enter the following:
  [Enter]
  [Enter]
  [Enter]
- +200M [Enter]
+ +500M [Enter]
  n [Enter]
  [Enter]
  [Enter]
@@ -53,7 +53,7 @@ Within fdisk, enter the following:
  [Enter]
  w [Enter]
 ```
-This is making a 200 MB boot partition, and giving the rest to the encrypted lvm2
+This is making a 500 MB boot partition, and giving the rest to the encrypted lvm2
 
 **5. Start the script:**
 
@@ -69,5 +69,13 @@ Then after a wait for all the preparations to have happened:
 * password for user, and some irrelevant info
 * about the keyboard
 * about the timezone
+
+**Installing into a pre-existing environment
+
+If there is already a boot-partition and/or a LVM partition that you want to use,
+that is entirely supported. Make sure that in editing the script, you make sure you have nothing
+listed as filesystem-type (then it doesn't get formatted). The root partition always gets formatted!!
+In LVM, if you're using pre-existing names for the Volume Group and/or the Logical Volumes (partitions),
+They won't get created.
 
 ## And that's it!
