@@ -2,11 +2,11 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt
+#  lmdescrypt 0.71
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
-#  or regular Linux Mint 17.1 or 17.2 to be:
+#  or regular Linux Mint 17.1 or 17.2 or 17.3 to be:
 #  Fully luks encrypted, with lvm2 volumes of root, swap and (optionally) data
 #
 # Github page: https://github.com/pepa65/lmdescrypt
@@ -28,7 +28,7 @@ set +o xtrace -o verbose -o errexit -o errtrace
 #### INSTRUCTIONS
 ############################################################################
 ##
-### 1. Boot the Live environment of LMDE 201403 or LMDE-2
+### 1. Boot the Live environment
 ##
 ### 2. Open a Terminal (Menu, Terminal) and enter:
 ##  wget j.mp/lmdescrypt
@@ -45,7 +45,7 @@ set +o xtrace -o verbose -o errexit -o errtrace
 ##    [Enter]
 ##    [Enter]
 ##    [Enter]
-##  +128M [Enter]
+##  +500M [Enter]
 ##  n [Enter]
 ##    [Enter]
 ##    [Enter]
@@ -53,7 +53,7 @@ set +o xtrace -o verbose -o errexit -o errtrace
 ##    [Enter]
 ##  w [Enter]
 ##
-## (This is making a 128 MB boot partition, and giving the rest to the encrypted lvm2)
+## (This is making a 500 MB boot partition, and giving the rest to the encrypted lvm2)
 ##
 ### 5. Start the script:
 ##
@@ -66,6 +66,13 @@ set +o xtrace -o verbose -o errexit -o errtrace
 ## - password for user, and some irrelevant info
 ## - about the keyboard
 ## - about the timezone
+##
+### Installing into a pre-existing environment
+## If there is already a boot-partition and/or a LVM partition that you want to use,
+## that is entirely supported. Make sure that in editing the script, you make sure you have nothing
+## listed as filesystem-type (then it doesn't get formatted). The root partition always gets formatted!!
+## In LVM, if you're using pre-existing names for the Volume Group and/or the Logical Volumes (partitions),
+## They won't get created.
 ##
 ### And that's it!
 #
@@ -308,34 +315,32 @@ then
 	((force_random)) && badblocks -c 10240 -s -w -t random -v "$crypt_device"
 	cryptsetup luksFormat $cryptopts "$crypt_device"
 else
-	cryptsetup isLuks "$crypt_device" && echo -e "\n  $crypt_device is already formatted, reencryption not forced" ||\
-			cryptsetup luksFormat $cryptopts "$crypt_device"
+	cryptsetup isLuks "$crypt_device" && echo -e "\n  $crypt_device is already formatted, reencryption not forced" \
+			|| cryptsetup luksFormat $cryptopts "$crypt_device"
 fi
 
-## Decrypt
-cryptsetup luksOpen "$crypt_device" $crypt_label
+## Decrypt if not yet mapped
+[[ -b "/dev/mapper/$crypt_label" ]] || cryptsetup luksOpen "$crypt_device" $crypt_label
 crypt_uuid=$(blkid -s UUID -o value "$crypt_device")
 dmsetup status
 
-## Make lvm2 volumes and format
-# If a volume with that label exists, nothing will happen
-grep \"$crypt_label\" <<<"$(vgscan)" && vgremove -f $crypt_label
-vgcreate $crypt_label /dev/mapper/$crypt_label
+## Make lvm2 volumes if not there yet and format if wanted
+grep \"$crypt_label\" <<<"$(vgscan)" || vgcreate $crypt_label /dev/mapper/$crypt_label
 if ((swap_gb))
 then
-	lvcreate $lvmswap -n $swap_label $crypt_label
+	[[ -b "/dev/$crypt_label/$swap_label" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
 	[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
 	swap_uuid=$(blkid -s UUID -o value "$swap_device")
 fi
 
-((rootfirst)) && ((root_gb)) && lvcreate $lvmroot -n $root_label $crypt_label
+((rootfirst)) && ((root_gb)) && ! [[ -b "/dev/$crypt_label/$root_label" ]] && lvcreate $lvmroot -n $root_label $crypt_label
 if ((data_gb))
 then
-	lvcreate $lvmdata -n $data_label $crypt_label
+	[[ -b "/dev/$crypt_label/$data_label" ]] || lvcreate $lvmdata -n $data_label $crypt_label
 	[[ $format_data ]] && mkfs -F -t "$format_data" -j -m 0 -L $data_label "$data_device"
 	data_uuid=$(blkid -s UUID -o value "$data_device")
 fi
-((rootfirst==0)) && ((root_gb)) && lvcreate $lvmroot -n $root_label $crypt_label
+((rootfirst==0)) && ((root_gb)) && ! [[ -b "/dev/$crypt_label/$root_label" ]] && lvcreate $lvmroot -n $root_label $crypt_label
 [[ $format_root ]] || format_root=ext4
 mkfs -F -t "$format_root" -j -L $root_label "$root_device"
 root_uuid=$(blkid -s UUID -o value "$root_device")
@@ -349,7 +354,13 @@ mkdir -p "$target"
 mount "$root_device" "$target"
 mkdir -p "$target/boot"
 mount "$boot_device" "$target/boot"
-((data_gb)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
+! [[ "format_boot" ]] && h=$(fsck -N "$target/boot"|grep -o ' fsck.[^ ]*') && format_boot=${h##*.}
+if ((data_gb))
+then
+	mkdir -p "$target/$data_label"
+	mount "$data_device" "$target/$data_label"
+	! [[ "format_data" ]] && h=$(fsck -N "$target/$data_label"|grep -o ' fsck.[^ ]*') && format_data=${h##*.}
+fi	
 df --sync -hlT -x tmpfs -x devtmpfs
 
 ## Copy
