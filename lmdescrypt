@@ -292,9 +292,10 @@ esac
 if [[ $data_size = REST ]]
 then
 	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST"
-	lvmdata='-l 100%FREE -Zn' || lvmdata="-L $data_size -Zn"
+	lvmdata='-l 100%FREE -Zn'
 else
 	! [[ $data_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format data_size: $data_size"
+	lvmdata="-L $data_size -Zn"
 fi
 
 if [[ $swap_size = DEFAULT ]]
@@ -323,12 +324,12 @@ else
 fi
 
 ## Decrypt if not yet mapped
-[[ -b "$crypt_device" ]] || cryptsetup luksOpen "$crypt_device" $crypt_label
+[[ -b "/dev/mapper/$crypt_label" ]] || cryptsetup luksOpen "$crypt_device" $crypt_label
 crypt_uuid=$(blkid -s UUID -o value "$crypt_device")
 dmsetup status
 
 ## Make lvm2 volumes if not there yet and format if wanted
-grep \"$crypt_label\" <<<"$(vgscan)" || vgcreate $crypt_label /dev/mapper/$crypt_label
+grep \" $crypt_label$\" <<<"$(vgs --noheadings -o vg_name)" || vgcreate $crypt_label /dev/mapper/$crypt_label
 if [[ $swap_size ]]
 then
 	[[ -b "$swap_device" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
