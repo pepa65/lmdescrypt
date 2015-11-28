@@ -286,15 +286,15 @@ case $1 in
 esac
 
 [[ $root_size = DEFAULT ]] && root_size=20G
-! [[ $root_size = REST ]] && ! [[ root_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format root_size: $root_size"
+! [[ $root_size = REST ]] && ! [[ $root_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format root_size: $root_size"
 
 [[ $data_size = DEFAULT ]] && data_size=REST
 if [[ $data_size = REST ]]
 then
 	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST"
-	lvmdata='-l 100%FREE -Zn' || lvmdata="-L ${data_size} -Zn"
+	lvmdata='-l 100%FREE -Zn' || lvmdata="-L $data_size -Zn"
 else
-	! [[ data_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format data_size: $data_size"
+	! [[ $data_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format data_size: $data_size"
 fi
 
 if [[ $swap_size = DEFAULT ]]
@@ -302,7 +302,7 @@ then
 	lvmswap="-L $(($(head -1 /proc/meminfo |sed 's/[^0-9]//g')+100000))K -Cy -Zn"
 else
 	! [[ $swap_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format swap_size: $swap_size"
-	lvmswap="-L ${swap_size} -Cy -Zn"
+	lvmswap="-L $swap_size -Cy -Zn"
 fi
 
 ((force_random)) && force_reencrypt=1
