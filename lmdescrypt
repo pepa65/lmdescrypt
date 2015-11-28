@@ -329,7 +329,7 @@ crypt_uuid=$(blkid -s UUID -o value "$crypt_device")
 dmsetup status
 
 ## Make lvm2 volumes if not there yet and format if wanted
-grep \" $crypt_label$\" <<<"$(vgs --noheadings -o vg_name)" || vgcreate $crypt_label /dev/mapper/$crypt_label
+grep " $crypt_label$" <<<"$(vgs --noheadings -o vg_name)" || vgcreate $crypt_label /dev/mapper/$crypt_label
 if [[ $swap_size ]]
 then
 	[[ -b "$swap_device" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
