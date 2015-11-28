@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.71
+#  lmdescrypt 0.72
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -99,28 +99,28 @@ force_reencrypt=0
 ## Indicate that you want to check for bad blocks and fill with pseudorandom data by putting 1 (otherwise 0):
 force_random=0
 
-### Make sure you're not allotting more space than what's available!
-## Specify lvm2 volume sizes in gigabites (GB), no decimal points:
-## - if 0 then no attempt will be made to create that volume
+### Make sure you're not allotting more space than what's available, and enough for root (6GB at least)!
+## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points, like: 10G or 200M
+## - if empty then no attempt will be made to create that volume
 ## - if REST (only for root or data, not both) then the rest of the available space will be used
 ## - if DEFAULT then root=20G swap=MEMSIZE+100M data=REST
-## - if misspelled (case sensitive!), it's taken to be 0!
-## The minimum size for root is 6GB currently
+## - if REST or DEFAULT are misspelled (case sensitive!), it's taken to be 0!
 root_size=REST
 swap_size=DEFAULT
-data_size=0
+data_size=
 
-### Adjust If reusing preexisting boot or data volumes
-##  root will always be formatted; swap will always be swap if formatted
-## Indicate which ones (apart from root) need formatting by putting the desires filesystem (otherwise empty):
-format_boot=ext2
+### Adjust If re-using preexisting boot or data volumes
+##  root will always be formatted! (if not specified, ext4 will be used)
 format_root=ext4
+## Fill in the desired filesystem-type, empty means no formatting (install over the current content):
+format_boot=ext2
 format_swap=swap
 format_data=ext4
 
 ### No need to adjust; according to preference
-## The crypt_label will also be used as the Volumegroup-name, and it will be pre-erased!
+## The crypt_label will also be used as the Volumegroup-name
 ## The data_label will also be the name of the mountpoint
+## If a Volumegroup or Logical volume with the same name exists, it will be used
 ## Specify the filesystem labels (no spaces):
 crypt_label=crypt
 boot_label=boot
@@ -185,9 +185,9 @@ Unmountinside(){
 Unmountall(){
 	umount "$target/dev"
 	umount "$target/boot"
-	((data_gb)) && umount "$target/$data_label"
+	[[ $data_size ]] && umount "$target/$data_label"
 	umount "$target"
-	((swap_gb)) && swapoff "$swap_device"
+	[[ $swap_size ]] && swapoff "$swap_device"
 	sync
 	sleep 1
 	vgchange -an
@@ -285,22 +285,25 @@ case $1 in
 		Exit "Unknown first argument to $self: $*" ;;
 esac
 
-((root_size)) && root_gb=$root_size
-[[ $root_size = DEFAULT ]] && root_gb=20
-rootfirst=0
-[[ $root_size = REST ]] && root_gb=1 && rootfirst=1 && lvmroot='-l 100%FREE -Zn'
-((root_gb)) || Exit "Unacceptable setting root_size: $root_size"
-((root_size!=0 && root_size<6)) && Exit "Setting root_size too small: $root_size"
-[[ $lvmroot ]] || lvmroot="-L ${root_gb}G -Zn"
+[[ $root_size = DEFAULT ]] && root_size=20G
+! [[ $root_size = REST ]] && ! [[ root_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format root_size: $root_size"
 
-((data_size)) && data_gb=$data_size && lvmdata="-L ${data_gb}G -Zn" || data_gb=0
 [[ $data_size = DEFAULT ]] && data_size=REST
-[[ $data_size = REST && $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST"
-[[ $data_size = REST ]] && data_gb=1 && lvmdata='-l 100%FREE -Zn'
+if [[ $data_size = REST ]]
+then
+	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST"
+	lvmdata='-l 100%FREE -Zn' || lvmdata="-L ${data_size} -Zn"
+else
+	! [[ data_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format data_size: $data_size"
+fi
 
-swap_gb=0
-((swap_size)) && swap_gb=$swap_size && lvmswap="-L ${swap_gb}G -Cy -Zn"
-[[ $swap_size = DEFAULT ]] && swap_gb=1 && lvmswap="-L $(($(head -1 /proc/meminfo |sed 's/[^0-9]//g')+100000))K -Cy -Zn"
+if [[ $swap_size = DEFAULT ]]
+then
+	lvmswap="-L $(($(head -1 /proc/meminfo |sed 's/[^0-9]//g')+100000))K -Cy -Zn"
+else
+	! [[ $swap_size =~ [1-9][0-9]*[MG] ]] && Exit "Unacceptable format swap_size: $swap_size"
+	lvmswap="-L ${swap_size} -Cy -Zn"
+fi
 
 ((force_random)) && force_reencrypt=1
 packages+=" linux-image-$(uname -r)"
@@ -320,27 +323,27 @@ else
 fi
 
 ## Decrypt if not yet mapped
-[[ -b "/dev/mapper/$crypt_label" ]] || cryptsetup luksOpen "$crypt_device" $crypt_label
+[[ -b "$crypt_device" ]] || cryptsetup luksOpen "$crypt_device" $crypt_label
 crypt_uuid=$(blkid -s UUID -o value "$crypt_device")
 dmsetup status
 
 ## Make lvm2 volumes if not there yet and format if wanted
 grep \"$crypt_label\" <<<"$(vgscan)" || vgcreate $crypt_label /dev/mapper/$crypt_label
-if ((swap_gb))
+if [[ $swap_size ]]
 then
-	[[ -b "/dev/$crypt_label/$swap_label" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
+	[[ -b "$swap_device" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
 	[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
 	swap_uuid=$(blkid -s UUID -o value "$swap_device")
 fi
 
-((rootfirst)) && ((root_gb)) && ! [[ -b "/dev/$crypt_label/$root_label" ]] && lvcreate $lvmroot -n $root_label $crypt_label
-if ((data_gb))
+! [[ $root_size = REST ]] && ! [[ -b "$root_device" ]] && lvcreate -L $root_size -Zn -n $root_label $crypt_label
+if [[ $data_size ]]
 then
-	[[ -b "/dev/$crypt_label/$data_label" ]] || lvcreate $lvmdata -n $data_label $crypt_label
+	[[ -b "$data_device" ]] || lvcreate $lvmdata -n $data_label $crypt_label
 	[[ $format_data ]] && mkfs -F -t "$format_data" -j -m 0 -L $data_label "$data_device"
 	data_uuid=$(blkid -s UUID -o value "$data_device")
 fi
-((rootfirst==0)) && ((root_gb)) && ! [[ -b "/dev/$crypt_label/$root_label" ]] && lvcreate $lvmroot -n $root_label $crypt_label
+[[ $root_size = REST ]] && ! [[ -b "$root_device" ]] && lvcreate -l 100%FREE -Zn -n $root_label $crypt_label
 [[ $format_root ]] || format_root=ext4
 mkfs -F -t "$format_root" -j -L $root_label "$root_device"
 root_uuid=$(blkid -s UUID -o value "$root_device")
@@ -354,12 +357,12 @@ mkdir -p "$target"
 mount "$root_device" "$target"
 mkdir -p "$target/boot"
 mount "$boot_device" "$target/boot"
-! [[ "format_boot" ]] && h=$(fsck -N "$target/boot"|grep -o ' fsck.[^ ]*') && format_boot=${h##*.}
-if ((data_gb))
+! [[ $format_boot ]] && h=$(fsck -N "$target/boot"|grep -o ' fsck.[^ ]*') && format_boot=${h##*.}
+if [[ $data_size ]]
 then
 	mkdir -p "$target/$data_label"
 	mount "$data_device" "$target/$data_label"
-	! [[ "format_data" ]] && h=$(fsck -N "$target/$data_label"|grep -o ' fsck.[^ ]*') && format_data=${h##*.}
+	! [[ $format_data ]] && h=$(fsck -N "$target/$data_label"|grep -o ' fsck.[^ ]*') && format_data=${h##*.}
 fi	
 df --sync -hlT -x tmpfs -x devtmpfs
 
@@ -373,7 +376,7 @@ cat <<-END >"$target/etc/fstab"
 	$root_device / $format_root relatime,errors=remount-ro 0 1
 	UUID=$boot_uuid /boot $format_boot relatime 0 2
 END
-((data_gb)) && echo "$data_device /$data_label $format_data relatime 0 2" >>"$target/etc/fstab"
+[[ $data_size ]] && echo "$data_device /$data_label $format_data relatime 0 2" >>"$target/etc/fstab"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
