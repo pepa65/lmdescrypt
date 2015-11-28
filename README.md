@@ -70,7 +70,7 @@ Then after a wait for all the preparations to have happened:
 * about the keyboard
 * about the timezone
 
-**Installing into a pre-existing environment
+### Installing into a pre-existing environment
 
 If there is already a boot-partition and/or a LVM partition that you want to use,
 that is entirely supported. Make sure that in editing the script, you make sure you have nothing
