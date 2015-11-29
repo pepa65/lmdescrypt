@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.72
+#  lmdescrypt 0.74
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -155,16 +155,17 @@ Exit(){	echo -e "  ERROR: $1\n  ABORTING"; exit 1;}
 
 Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 ## Supported are: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
-	[[ $4 = boot && $1 = f2fs ]] && Exit "Grub does not support an $1 filesystem on $4"
 	case $1 in
+		hfs|hfsplus|jfs|msdos|vfat|ntfs) ! [[ $4 = data ]] && Exit "A $1 filesystem is not supported on $4" ;;&
+		## Continue even if the above pattern matched
 		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
 		hfs) mkfs.$1 -h -v "$2" "$3" ;;
 		hfsplus) mkfs.$1 -J -v "$2" "$3" ;;
-		jfs) mkfs.$1 -L "$2" "$3" ;;
+		jfs) mkfs.$1 -q -L "$2" "$3" ;;
 		minix) mkfs.$1 "$3" ;;
 		msdos|vfat) mkfs.$1 -n "$2" "$3" ;;
 		ntfs) mkfs.$1 -f -F -U -L "$2" "$3" ;;
-		reiserfs) mkfs.$1 -ff -L "$2" "$3" ;;
+		reiserfs) mkfs.$1 -ffl "$2" "$3" ;;
 		xfs) mkfs.$1 -f -L "$2" "$3" ;;
 		*) Exit "Unsupported filesystem $1 for $4-device $3 with label $2" ;;
 	esac
@@ -180,7 +181,7 @@ Rechroot(){
 	mount "$root_device" "$target"
 	mkdir -p "$target/boot"
 	mount "$boot_device" "$target/boot"
-	((data_size)) && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
+	[[ $data_size ]] && mkdir -p "$target/$data_label" && mount "$data_device" "$target/$data_label"
 	df --sync -hlT -x tmpfs -x devtmpfs
 	mount --bind /dev "$target/dev"
 	chroot "$target"
