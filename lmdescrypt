@@ -112,7 +112,8 @@ data_size=
 ### Adjust If re-using preexisting boot or data volumes
 ##  root will always be formatted! (if not specified, ext4 will be used)
 ## Fill in the desired filesystem-type, empty means no formatting (install over the current content)
-## Supported are: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
+## Supported for boot and root: ext2 ext3 ext4 reiserfs xfs
+## Supported for data: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
 format_root=ext4
 format_boot=ext2
 format_swap=swap
@@ -154,9 +155,8 @@ packages=''
 Exit(){	echo -e "  ERROR: $1\n  ABORTING"; exit 1;}
 
 Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
-## Supported are: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
 	case $1 in
-		hfs|hfsplus|jfs|msdos|vfat|ntfs) ! [[ $4 = data ]] && Exit "A $1 filesystem is not supported on $4" ;;&
+		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) ! [[ $4 = data ]] && Exit "A $1 filesystem is not supported on $4" ;;&
 		## Continue even if the above pattern matched
 		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
 		hfs) mkfs.$1 -h -v "$2" "$3" ;;
@@ -354,22 +354,19 @@ if [[ $swap_size ]]
 then
 	[[ -b "$swap_device" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
 	[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
-	swap_uuid=$(blkid -s UUID -o value "$swap_device")
 fi
 
 ! [[ $root_size = REST ]] && ! [[ -b "$root_device" ]] && lvcreate -L $root_size -Zn -n $root_label $crypt_label
 if [[ $data_size ]]
 then
 	[[ -b "$data_device" ]] || lvcreate $lvmdata -n $data_label $crypt_label
-	[[ $format_data ]] && Mkfs "$format_data" "$data_label" "$data_device"
-	data_uuid=$(blkid -s UUID -o value "$data_device")
+	[[ $format_data ]] && Mkfs "$format_data" "$data_label" "$data_device" data
 fi
 [[ $root_size = REST ]] && ! [[ -b "$root_device" ]] && lvcreate -l 100%FREE -Zn -n $root_label $crypt_label
 [[ $format_root ]] || format_root=ext4
-Mkfs "$format_root" "$root_label" "$root_device"
-root_uuid=$(blkid -s UUID -o value "$root_device")
+Mkfs "$format_root" "$root_label" "$root_device" root
 
-[[ $format_boot ]] && Mkfs "$format_boot" "$boot_label" "$boot_device"
+[[ $format_boot ]] && Mkfs "$format_boot" "$boot_label" "$boot_device" boot
 boot_uuid=$(blkid -s UUID -o value "$boot_device")
 
 ## Mount
