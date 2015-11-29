@@ -1,5 +1,5 @@
 # lmdescrypt
-### version 0.74
+### version 0.75
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504)
@@ -24,7 +24,6 @@ Questions?  solusos@passchier.net or post an Issue on the github page
 
 ```
 wget j.mp/lmdescrypt
-chmod +x lmdescrypt
 ```
 
 **3. If needed, adapt the SETTINGS section:**
@@ -59,7 +58,7 @@ This is making a 500 MB boot partition, and giving the rest to the encrypted lvm
 **5. Start the script:**
 
 ```
-sudo ./lmdescrypt
+sudo source lmdescrypt
 ```
 
 **6. Answer the questions as they come up:**

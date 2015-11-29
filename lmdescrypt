@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.74
+#  lmdescrypt 0.75
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -101,13 +101,12 @@ force_random=0
 
 ### Make sure you're not allotting more space than what's available, and enough for root (6GB at least)!
 ## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points, like: 10G or 200M
-## - if empty then no attempt will be made to create that volume
+## - if empty then no attempt will be made to create that volume!
 ## - if REST (only for root or data, not both) then the rest of the available space will be used
-## - if DEFAULT then root=20G swap=MEMSIZE+100M data=REST
-## - if REST or DEFAULT are misspelled (case sensitive!), it's taken to be 0!
-root_size=REST
+## - if DEFAULT for one or more, that means: root=20G swap=MEMSIZE+100M data=REST
+root_size=DEFAULT
 swap_size=DEFAULT
-data_size=
+data_size=DEFAULT
 
 ### Adjust If re-using preexisting boot or data volumes
 ##  root will always be formatted! (if not specified, ext4 will be used)
@@ -244,6 +243,8 @@ Inside(){ # 1:$username 2:$grub_device $packages
 #### INIT
 ############################################################################
 
+((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
+
 [[ -w "$boot_device" ]] || Exit "Boot device does not exist or is not writable: $boot_device"
 [[ -w "$crypt_device" ]] || Exit "Crypt device does not exist or is not writable: $crypt_device"
 [[ -w "$grub_device" ]] || Exit "Grub device does not exist or is not writable: $grub_device"
@@ -275,7 +276,9 @@ else  ## regular Mint
 	[[ -d /cdrom ]] && inside=0 || inside=1
 fi
 
-self=$(basename $0)
+self=$(basename $BASH_SOURCE)
+
+## These are commandline arguments
 case $1 in
 	inside)
 		((inside)) || Exit "Invalid call 'inside', not in chroot: $self $*"
@@ -350,11 +353,8 @@ dmsetup status
 ## Make lvm2 volumes if not there yet and format if wanted
 grep " $crypt_label$" <<<"$(vgs --noheadings -o vg_name)" || vgcreate $crypt_label /dev/mapper/$crypt_label
 
-if [[ $swap_size ]]
-then
-	[[ -b "$swap_device" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
-	[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
-fi
+[[ $swap_size && -b "$swap_device" ]] || lvcreate $lvmswap -n $swap_label $crypt_label
+[[ $format_swap ]] && mkswap -f -L $swap_label "$swap_device"
 
 ! [[ $root_size = REST ]] && ! [[ -b "$root_device" ]] && lvcreate -L $root_size -Zn -n $root_label $crypt_label
 if [[ $data_size ]]
@@ -382,7 +382,7 @@ then
 	mkdir -p "$target/$data_label"
 	mount "$data_device" "$target/$data_label"
 	! [[ $format_data ]] && h=$(fsck -N "$data_device"|grep -o ' fsck.[^ ]*') && format_data=${h##*.}
-fi	
+fi
 df --sync -hlT -x tmpfs -x devtmpfs
 
 ## Copy
