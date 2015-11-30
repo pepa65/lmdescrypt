@@ -24,6 +24,7 @@ Questions?  solusos@passchier.net or post an Issue on the github page
 
 ```
 wget j.mp/lmdescrypt
+chmod +x lmdescrypt
 ```
 
 **3. If needed, adapt the SETTINGS section:**
@@ -58,7 +59,7 @@ This is making a 500 MB boot partition, and giving the rest to the encrypted lvm
 **5. Start the script:**
 
 ```
-sudo source lmdescrypt
+sudo ./lmdescrypt
 ```
 
 **6. Answer the questions as they come up:**
