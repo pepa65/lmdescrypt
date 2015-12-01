@@ -176,10 +176,10 @@ self=$(basename $cself)
 ((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
 
 target='/target'
-crypt_map="/dev/mapper/$crypt_label"
-root_map="/dev/mapper/$crypt_label-$root_label"
-data_map="/dev/mapper/$crypt_label-$data_label"
-swap_map="/dev/mapper/$crypt_label-$swap_label"
+crypt_dev="/dev/mapper/$crypt_label"
+root_dev="/dev/$crypt_label/$root_label"
+data_dev="/dev/$crypt_label/$data_label"
+swap_dev="/dev/$crypt_label/$swap_label"
 
 [[ -w "$boot_part" ]] || Exit "Boot device does not exist or is not writable: $boot_part"
 [[ -w "$crypt_part" ]] || Exit "Crypt device does not exist or is not writable: $crypt_part"
@@ -188,29 +188,28 @@ swap_map="/dev/mapper/$crypt_label-$swap_label"
 [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] || Exit "Illegal format for hostname: $hostname"
 [[ $crypt_label ]] || Exit "Label crypt_label must be filled in!"
 [[ $crypt_label = "${crypt_label/ /}" ]] || Exit "Label 'crypt_label' contains spaces: $crypt_label"
+[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable"
 [[ $boot_label ]] || Exit "Label boot_label must be filled in!"
 [[ $boot_label = "${boot_label/ /}" ]] || Exit "Label 'boot_label' contains spaces: $boot_label"
+! [[ $boot_format ]] && boot_fs=$(lsblk "$boot_part" -no FSTYPE) || boot_fs=$boot_format
+! [[ $boot_fs ]] && Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_format'"
 [[ $root_label ]] || Exit "Label root_label must be filled in!"
 [[ $root_label = "${root_label/ /}" ]] || Exit "Label 'root_label' contains spaces: $root_label"
+! [[ $root_format ]] && root_fs=$(lsblk "$root_dev" -no FSTYPE) || root_fs=$root_format
+! [[ $root_fs ]] && Exit "Root volume is not formatted; format first or fill in 'root_format'"
 [[ $swap_label = "${swap_label/ /}" ]] || Exit "Label 'swap_label' contains spaces: $swap_label"
-[[ $swap_label ]] && ! [[ $swap_size ]] && ! [[ -b $swap_map ]] \
+[[ $swap_label ]] && ! [[ $swap_size ]] && ! [[ -b $swap_dev ]] \
 		&& Exit "There is no pre-existing swap volume $swap_label, and no 'swap_size' given to make one"
 [[ $data_label = "${data_label/ /}" ]] || Exit "Label 'data_label' contains spaces: $data_label"
 if [[ $data_label ]]
 then
-	! [[ -b $data_map ]] && ! [[ $data_size ]] \
+	! [[ -b $data_dev ]] && ! [[ $data_size ]] \
 			&& Exit "There is no pre-existing data volume $data_label, and no 'data_size' given to make one"
-	! [[ -b $data_map ]] && ! [[ $data_format ]] \
+	! [[ -b $data_dev ]] && ! [[ $data_format ]] \
 			&& Exit "Can't use a newly created data volume without formatting, fill in 'data_format'"
+	! [[ $data_format ]] && data_fs=$(lsblk "$data_dev" -no FSTYPE) || data_fs=$data_format
+	! [[ $data_fs ]] && Exit "Data volume is not formatted; format first or fill in 'data_format'"
 fi
-
-## Pre-existing volumes that are not going to be formatted, need to determine their filesystem
-! [[ $boot_format ]] && boot_fs=$(lsblk "$boot_part" -no FSTYPE) || boot_fs=$boot_format
-! [[ $boot_fs ]] && Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_format'"
-! [[ $root_format ]] && root_fs=$(lsblk "$root_map" -no FSTYPE) || root_fs=$root_format
-! [[ $root_fs ]] && Exit "Root volume is not formatted; format first or fill in 'root_format'"
-! [[ $data_format ]] && data_fs=$(lsblk "$data_map" -no FSTYPE) || data_fs=$data_format
-! [[ $data_fs ]] && Exit "Data volume is not formatted; format first or fill in 'data_format'"
 
 rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
 rofslm='/rofs'
@@ -268,23 +267,23 @@ esac
 if [[ $data_size = REST ]]
 then
 	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST"
-	lvmdata='-l 100%FREE -Zn'
+	lvmdata='-l 100%FREE -Zy'
 else
 	if [[ $data_size ]]
 	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] && Exit "Invalid format data_size: $data_size"
-		lvmdata="-L $data_size -Zn"
+		lvmdata="-L $data_size -Zy"
 	fi
 fi
 
 if [[ $swap_size = DEFAULT ]]
 then
-	lvmswap="-L $(($(head -1 /proc/meminfo |sed 's/[^0-9]//g')+100000))K -Cy -Zn"
+	lvmswap="-L $(($(head -1 /proc/meminfo |sed 's/[^0-9]//g')+100000))K -Cy -Zy"
 else
 	if [[ $swap_size ]]
 	then
 		! [[ $swap_size =~ [1-9][0-9]*[MG] ]] && Exit "Invalid format swap_size: $swap_size"
-		lvmswap="-L $swap_size -Cy -Zn"
+		lvmswap="-L $swap_size -Cy -Zy"
 	fi
 fi
 
@@ -306,39 +305,42 @@ else
 fi
 
 ## Decrypt if not yet mapped
-[[ -b "$crypt_map" ]] || cryptsetup luksOpen "$crypt_part" $crypt_label
+[[ -b "$crypt_dev" ]] || cryptsetup luksOpen "$crypt_part" $crypt_label
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
-dmsetup status
 
 ## Make lvm2 volumes if not there yet and format if wanted
-grep " $crypt_label$" <<<"$(vgs --noheadings -o vg_name)" || vgcreate $crypt_label $crypt_map
+grep " $crypt_label$" <<<"$(vgs --noheadings -o vg_name)" || vgcreate -Zy $crypt_label $crypt_dev
+vgchange --refresh
+[[ -h $root_dev ]] && root_nomap=0 || root_nomap=1
+[[ -h $swap_dev ]] && swap_nomap=0 || swap_nomap=1
+[[ -h $data_dev ]] && data_nomap=0 || data_nomap=1
 
-[[ $swap_size ]] && ! [[ -b "$swap_map" ]] && sleep 1 && lvcreate $lvmswap -n $swap_label $crypt_label
-[[ $swap_label ]] && mkswap -f -L $swap_label "$swap_map"
+[[ $swap_size ]] && ((swap_nomap)) && lvcreate $lvmswap -n $swap_label $crypt_label
+[[ $swap_label ]] && mkswap -f -L $swap_label "$swap_dev"
 
-! [[ $root_size = REST ]] && ! [[ -b "$root_map" ]] && sleep 1 && lvcreate -L $root_size -Zn -n $root_label $crypt_label
+! [[ $root_size = REST ]] && ((root_nomap)) && lvcreate -L $root_size -Zy -n $root_label $crypt_label
 if [[ $data_size ]]
 then
-	! [[ -b "$data_map" ]] && sleep 1 && lvcreate $lvmdata -n $data_label $crypt_label
-	[[ $data_format ]] && Mkfs "$data_format" "$data_label" "$data_map" data
+	((data_nomap)) && lvcreate $lvmdata -n $data_label $crypt_label
+	[[ $data_format ]] && Mkfs "$data_format" "$data_label" "$data_dev" data
 fi
-[[ $root_size = REST ]] && ! [[ -b "$root_map" ]] && sleep 1 && lvcreate -l 100%FREE -Zn -n $root_label $crypt_label
-[[ $root_format ]] && Mkfs "$root_format" "$root_label" "$root_map" root
+[[ $root_size = REST ]] && ((root_nomap)) && lvcreate -l 100%FREE -Zy -n $root_label $crypt_label
+[[ $root_format ]] && Mkfs "$root_format" "$root_label" "$root_dev" root
 
 [[ $boot_format ]] && Mkfs "$boot_format" "$boot_label" "$boot_part" boot
 boot_uuid=$(blkid -s UUID -o value "$boot_part")
 
 ## Mount
-[[ $swap_label ]] && swapon "$swap_map"
+[[ $swap_label ]] && swapon "$swap_dev"
 swapon -s
 mkdir -p "$target"
-mount "$root_map" "$target"
+mount "$root_dev" "$target"
 mkdir -p "$target/boot"
 mount "$boot_part" "$target/boot"
 if [[ $data_label ]]
 then
 	mkdir -p "$target/$data_label"
-	mount "$data_map" "$target/$data_label"
+	mount "$data_dev" "$target/$data_label"
 fi
 df --sync -hlT -x tmpfs -x devtmpfs
 
@@ -348,16 +350,16 @@ cp -a "$rofs"/* "$target"
 ## Prepare root
 cat <<-END >"$target/etc/fstab"
 	proc /proc proc defaults 0 0
-	$swap_map $swap_label swap sw 0 0
-	$root_map / $root_fs relatime,errors=remount-ro 0 1
+	$swap_dev $swap_label swap sw 0 0
+	$root_dev / $root_fs relatime,errors=remount-ro 0 1
 	UUID=$boot_uuid /boot $boot_fs relatime 0 2
 END
-[[ $data_label ]] && echo "$data_map /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
+[[ $data_label ]] && echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
 echo $hostname >"$target/etc/hostname"
-echo "$LANG UTF-8" >>"$target/etc/locale.gen"
+echo "$LANG.UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$rself" "$target/root/$self"
@@ -368,7 +370,7 @@ umount "$target/dev"
 umount "$target/boot"
 [[ $data_size ]] && umount "$target/$data_label"
 umount "$target"
-[[ $swap_size ]] && swapoff "$swap_map"
+[[ $swap_size ]] && swapoff "$swap_dev"
 sync
 sleep 1
 vgchange -an
