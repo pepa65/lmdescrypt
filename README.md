@@ -1,5 +1,5 @@
 # lmdescrypt
-### version 0.75
+### version 0.77
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504)
@@ -73,10 +73,7 @@ Then after a wait for all the preparations to have happened:
 
 ### Installing into a pre-existing environment
 
-If there is already a boot-partition and/or a LVM partition that you want to use,
-that is entirely supported. Make sure that in editing the script, you make sure you have nothing
-listed as filesystem-type (then it doesn't get formatted). The root partition always gets formatted!!
-In LVM, if you're using pre-existing names for the Volume Group and/or the Logical Volumes (partitions),
-They won't get created.
+Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
+There is the option to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
 
 ## And that's it!
