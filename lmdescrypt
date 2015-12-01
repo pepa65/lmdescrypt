@@ -119,12 +119,11 @@ data_size=REST
 
 ### Adjust if re-using preexisting boot or data volumes!
 ## Fill in the desired filesystem-type, -empty- means it will NOT BE FORMATTED! (install over current content)
-## Supported for boot and root: ext2 ext3 ext4 reiserfs xfs. Supported for swap: swap
+## Supported for boot and root: ext2 ext3 ext4 reiserfs xfs.
 ## Supported for data: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
-boot_fs=ext2
-root_fs=ext4
-swap_fs=swap
-data_fs=ext4
+boot_format=ext2
+root_format=ext4
+data_format=ext4
 
 ### Adjust only if installing to a secondary drive, or needing to keep old bootloader
 ## Specify the device where to install grub by any valid device path:
@@ -197,8 +196,21 @@ swap_map="/dev/mapper/$crypt_label-$swap_label"
 [[ $swap_label ]] && ! [[ $swap_size ]] && ! [[ -b $swap_map ]] \
 		&& Exit "There is no pre-existing swap volume $swap_label, and no 'swap_size' given to make one"
 [[ $data_label = "${data_label/ /}" ]] || Exit "Label 'data_label' contains spaces: $data_label"
-[[ $data_label ]] && ! [[ $data_size ]] && ! [[ -b $data_map ]] \
-		&& Exit "There is no pre-existing data volume $data_label, and no 'data_size' given to make one"
+if [[ $data_label ]]
+then
+	! [[ -b $data_map ]] && ! [[ $data_size ]] \
+			&& Exit "There is no pre-existing data volume $data_label, and no 'data_size' given to make one"
+	! [[ -b $data_map ]] && ! [[ $data_format ]] \
+			&& Exit "Can't use a newly created data volume without formatting, fill in 'data_format'"
+fi
+
+## Pre-existing volumes that are not going to be formatted, need to determine their filesystem
+! [[ $boot_format ]] && boot_fs=$(lsblk "$boot_part" -no FSTYPE) || boot_fs=$boot_format
+! [[ $boot_fs ]] && Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_format'"
+! [[ $root_format ]] && root_fs=$(lsblk "$root_map" -no FSTYPE) || root_fs=$root_format
+! [[ $root_fs ]] && Exit "Root volume is not formatted; format first or fill in 'root_format'"
+! [[ $data_format ]] && data_fs=$(lsblk "$data_map" -no FSTYPE) || data_fs=$data_format
+! [[ $data_fs ]] && Exit "Data volume is not formatted; format first or fill in 'data_format'"
 
 rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
 rofslm='/rofs'
@@ -301,19 +313,19 @@ dmsetup status
 ## Make lvm2 volumes if not there yet and format if wanted
 grep " $crypt_label$" <<<"$(vgs --noheadings -o vg_name)" || vgcreate $crypt_label $crypt_map
 
-[[ $swap_size ]] && ! [[ -b "$swap_map" ]] && lvcreate $lvmswap -n $swap_label $crypt_label
-[[ $swap_fs = swap ]] && mkswap -f -L $swap_label "$swap_map"
+[[ $swap_size ]] && ! [[ -b "$swap_map" ]] && sleep 1 && lvcreate $lvmswap -n $swap_label $crypt_label
+[[ $swap_label ]] && mkswap -f -L $swap_label "$swap_map"
 
-! [[ $root_size = REST ]] && ! [[ -b "$root_map" ]] && lvcreate -L $root_size -Zn -n $root_label $crypt_label
+! [[ $root_size = REST ]] && ! [[ -b "$root_map" ]] && sleep 1 && lvcreate -L $root_size -Zn -n $root_label $crypt_label
 if [[ $data_size ]]
 then
-	! [[ -b "$data_map" ]] && lvcreate $lvmdata -n $data_label $crypt_label
-	[[ $data_fs ]] && Mkfs "$data_fs" "$data_label" "$data_map" data
+	! [[ -b "$data_map" ]] && sleep 1 && lvcreate $lvmdata -n $data_label $crypt_label
+	[[ $data_format ]] && Mkfs "$data_format" "$data_label" "$data_map" data
 fi
-[[ $root_size = REST ]] && ! [[ -b "$root_map" ]] && lvcreate -l 100%FREE -Zn -n $root_label $crypt_label
-[[ $root_fs ]] && Mkfs "$root_fs" "$root_label" "$root_map" root
+[[ $root_size = REST ]] && ! [[ -b "$root_map" ]] && sleep 1 && lvcreate -l 100%FREE -Zn -n $root_label $crypt_label
+[[ $root_format ]] && Mkfs "$root_format" "$root_label" "$root_map" root
 
-[[ $boot_fs ]] && Mkfs "$boot_fs" "$boot_label" "$boot_part" boot
+[[ $boot_format ]] && Mkfs "$boot_format" "$boot_label" "$boot_part" boot
 boot_uuid=$(blkid -s UUID -o value "$boot_part")
 
 ## Mount
@@ -323,16 +335,10 @@ mkdir -p "$target"
 mount "$root_map" "$target"
 mkdir -p "$target/boot"
 mount "$boot_part" "$target/boot"
-! [[ $boot_fs ]] && boot_fs=$(lsblk "$boot_part" -no FSTYPE)
-! [[ $boot_fs ]] && Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs'"
-! [[ $root_fs ]] && root_fs=$(lsblk "$root_map" -no FSTYPE)
-! [[ $root_fs ]] && Exit "Root volume is not formatted; format first or fill in 'root_fs'"
 if [[ $data_label ]]
 then
 	mkdir -p "$target/$data_label"
 	mount "$data_map" "$target/$data_label"
-	! [[ $data_fs ]] && data_fs=$(lsblk "$data_map" -no FSTYPE)
-	! [[ $data_fs ]] && Exit "Data volume is not formatted; format first or fill in 'data_fs'"
 fi
 df --sync -hlT -x tmpfs -x devtmpfs
 
