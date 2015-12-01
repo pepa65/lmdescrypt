@@ -189,7 +189,7 @@ then  ## Inside the chroot of the new system on /target
 		mount -t proc proc /proc
 		mount -t devpts pts /dev/pts
 		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-		locale-gen
+		locale-gen --purge --no-archive
 		useradd -ms /bin/bash $username
 		until passwd $username; do :;done
 		addgroup $username sudo
