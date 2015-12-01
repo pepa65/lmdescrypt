@@ -175,6 +175,41 @@ rself=$(readlink -e $cself)
 self=$(basename $cself)
 ((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
 
+## The chroot invocation
+if [[ $1 = inside ]]
+then  ## Inside the chroot of the new system on /target
+		((lmde)) && [[ -d /lib/live/mount ]] && Exit "Not in chroot, can't call 'inside': $self $*"
+		! ((lmde)) && [[ -d /cdrom ]] && Exit "Not in chroot, can't call 'inside': $self $*"
+		username=$2
+		grub_device=$3
+		lmde=$4
+		shift 4
+		packages=$*
+		mount -t sysfs sys /sys
+		mount -t proc proc /proc
+		mount -t devpts pts /dev/pts
+		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
+		locale-gen
+		useradd -ms /bin/bash $username
+		until passwd $username; do :;done
+		addgroup $username sudo
+		passwd -l root
+		dpkg --configure -a
+		dpkg-reconfigure keyboard-configuration
+		dpkg-reconfigure tzdata
+		apt-get update
+		rm -f /initrd.img
+		[[ "$packages" ]] && apt-get --yes --force-yes --reinstall install $packages
+		((lmde)) && apt-get --yes purge '^live-.*'
+		update-grub
+		grub-install --recheck --force "$grub_device"
+		((lmde)) && rm -rvf /lib/live
+		umount /dev/pts
+		umount /proc
+		umount /sys
+		exit 0
+fi
+
 target='/target'
 crypt_dev="/dev/mapper/$crypt_label"
 root_dev="/dev/$crypt_label/$root_label"
@@ -211,57 +246,6 @@ then
 	! [[ $data_fs ]] && Exit "Data volume is not formatted; format first or fill in 'data_format'"
 fi
 
-rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
-rofslm='/rofs'
-if [[ -d /lib/live ]]
-then  ## Debian Edition
-	lmde=1
-	rofs=$rofsde
-	## Detect whether on Live system or not
-	[[ -d /lib/live/mount ]] && inchroot=0 || inchroot=1
-else  ## regular Mint
-	lmde=0
-	rofs=$rofslm
-	## Detect whether on Live system or not
-	[[ -d /cdrom ]] && inchroot=0 || inchroot=1
-fi
-
-case $1 in
-	inside)  ## Inside the chroot of the new system on /target
-		! ((inchroot)) && Exit "Invalid call 'inside' when not in chroot: $self $*"
-		username=$2
-		grub_device=$3
-		shift 3
-		packages=$*
-		mount -t sysfs sys /sys
-		mount -t proc proc /proc
-		mount -t devpts pts /dev/pts
-		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-		locale-gen
-		useradd -ms /bin/bash $username
-		until passwd $username; do :;done
-		addgroup $username sudo
-		passwd -l root
-		dpkg --configure -a
-		dpkg-reconfigure keyboard-configuration
-		dpkg-reconfigure tzdata
-		apt-get update
-		rm -f /initrd.img
-		[[ "$packages" ]] && apt-get --yes --force-yes --reinstall install $packages
-		((lmde)) && apt-get --yes purge '^live-.*'
-		update-grub
-		grub-install --recheck --force "$grub_device"
-		((lmde)) && rm -rvf /lib/live
-		umount /dev/pts
-		umount /proc
-		umount /sys
-		exit 0 ;;
-	'')
-		((inchroot)) && Exit "Invalid plain command $self, not in live environment" ;;
-	*)
-		Exit "Unknown first argument to $self: $*" ;;
-esac
-
 [[ $root_size ]] && ! [[ $root_size = REST ]] && ! [[ $root_size =~ [1-9][0-9]*[MG] ]] \
 		&& Exit "Invalid format root_size: $root_size"
 if [[ $data_size = REST ]]
@@ -289,6 +273,18 @@ fi
 
 ((force_random)) && force_reencrypt=1
 packages+=" linux-image-$(uname -r)"
+
+rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
+rofslm='/rofs'
+if [[ -d /lib/live ]]
+then  ## Debian Edition
+	lmde=1
+	rofs=$rofsde
+else  ## regular Mint
+	lmde=0
+	rofs=$rofslm
+fi
+
 
 ############################################################################
 #### MAIN
@@ -364,7 +360,9 @@ rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$rself" "$target/root/$self"
 mount --bind /dev "$target/dev"
-chroot "$target" "/root/$self" inside $username $grub_device $packages
+
+## Enter the fresh installation to finish up
+chroot "$target" "/root/$self" inside $username $grub_device $lmde $packages
 
 umount "$target/dev"
 umount "$target/boot"
