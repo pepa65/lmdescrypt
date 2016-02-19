@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.80
+#  lmdescrypt 0.81
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -193,9 +193,28 @@ then  ## Inside the chroot of the new system on /target
 		export LC_ALL=C
 		locale-gen --purge --no-archive
 		useradd -ms /bin/bash $username
-		until passwd $username; do :;done
+		pw="" pwa="" setting_pw=1
+		while ((setting_pw))
+		do
+			pw=$(/lib/cryptsetup/askpass "Enter password for $username: ")
+			echo
+			if [[ "$pw" ]]
+			then
+				pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
+				echo
+				[[ "$pw" = "$pwa" ]] && setting_pw=0 || echo -e "Passwords not the same, do it again!\n"
+			else
+				echo -e "\nPassword can't be empty!"
+			fi
+		done
+		pwa=$(printf %${#pw}s)
+		chpw="$username:$pw"
+		((lmde)) && chpw="$chpw"$'\n'"root:$pw"
+		pw=$pwa
+		chpasswd -S <<<"$chpw"
+		chpw=$(printf %${#chpw}s)
 		addgroup $username sudo
-		passwd -l root
+		((lmde)) || passwd -l root
 		dpkg --configure -a
 		dpkg-reconfigure keyboard-configuration
 		dpkg-reconfigure tzdata
