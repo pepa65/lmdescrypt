@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.82
+#  lmdescrypt 0.83
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -191,7 +191,7 @@ then  ## Inside the chroot of the new system on /target
 		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
 		export LANGUAGE=${LANG%%.*}
 		export LC_ALL=C
-		locale-gen --purge --no-archive
+		locale-gen --purge $LANGUAGE
 		useradd -ms /bin/bash $username
 		pw="" pwa="" setting_pw=1
 		while ((setting_pw))
