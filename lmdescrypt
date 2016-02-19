@@ -196,11 +196,11 @@ then  ## Inside the chroot of the new system on /target
 		pw="" pwa="" setting_pw=1
 		while ((setting_pw))
 		do
-			pw=$(/lib/cryptsetup/askpass "Enter password for user $username: ") &>/dev/null
+			pw=$(/lib/cryptsetup/askpass "Enter password for user $username: ")
 			echo
 			if [[ "$pw" ]]
 			then
-				pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ") &>/dev/null
+				pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
 				echo
 				[[ "$pw" = "$pwa" ]] && setting_pw=0 || echo -e "Passwords not the same, do it again!\n"
 			else
