@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.79
+#  lmdescrypt 0.80
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -189,6 +189,8 @@ then  ## Inside the chroot of the new system on /target
 		mount -t proc proc /proc
 		mount -t devpts pts /dev/pts
 		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
+		export LANGUAGE=${LANG%%.*}
+		export LC_ALL=C
 		locale-gen --purge --no-archive
 		useradd -ms /bin/bash $username
 		until passwd $username; do :;done
@@ -203,6 +205,7 @@ then  ## Inside the chroot of the new system on /target
 		((lmde)) && apt-get --yes purge '^live-.*'
 		update-grub
 		grub-install --recheck --force "$grub_device"
+		gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 		((lmde)) && rm -rvf /lib/live
 		umount /dev/pts
 		umount /proc
