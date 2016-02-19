@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.77
+#  lmdescrypt 0.78
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -113,9 +113,9 @@ data_label=data
 ## - if -empty- then the volume will NOT BE CREATED! (whether it pre-exists or not)
 ## - if REST (only for root or data, not both) then the rest of the available space will be used
 ## - if DEFAULT for swap that means: MEMSIZE+100M
-root_size=20G
+root_size=REST
 swap_size=DEFAULT
-data_size=REST
+data_size=
 
 ### Adjust if re-using preexisting boot or data volumes!
 ## Fill in the desired filesystem-type, -empty- means it will NOT BE FORMATTED! (install over current content)
@@ -123,7 +123,7 @@ data_size=REST
 ## Supported for data: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
 boot_format=ext2
 root_format=ext4
-data_format=ext4
+data_format=
 
 ### Adjust only if installing to a secondary drive, or needing to keep old bootloader
 ## Specify the device where to install grub by any valid device path:
