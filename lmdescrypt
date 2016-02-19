@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.83
+#  lmdescrypt 0.84
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -189,8 +189,6 @@ then  ## Inside the chroot of the new system on /target
 		mount -t proc proc /proc
 		mount -t devpts pts /dev/pts
 		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-		export LANGUAGE=${LANG%%.*}
-		export LC_ALL=C
 		locale-gen --purge $LANGUAGE
 		useradd -ms /bin/bash $username
 		pw="" pwa="" setting_pw=1
@@ -377,7 +375,7 @@ echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
 echo $hostname >"$target/etc/hostname"
-echo "$LANG.UTF-8" >>"$target/etc/locale.gen"
+echo "$LANG UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$rself" "$target/root/$self"
