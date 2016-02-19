@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.81
+#  lmdescrypt 0.82
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -196,11 +196,11 @@ then  ## Inside the chroot of the new system on /target
 		pw="" pwa="" setting_pw=1
 		while ((setting_pw))
 		do
-			pw=$(/lib/cryptsetup/askpass "Enter password for $username: ")
+			pw=$(/lib/cryptsetup/askpass "Enter password for user $username: ") &>/dev/null
 			echo
 			if [[ "$pw" ]]
 			then
-				pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
+				pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ") &>/dev/null
 				echo
 				[[ "$pw" = "$pwa" ]] && setting_pw=0 || echo -e "Passwords not the same, do it again!\n"
 			else
@@ -211,7 +211,7 @@ then  ## Inside the chroot of the new system on /target
 		chpw="$username:$pw"
 		((lmde)) && chpw="$chpw"$'\n'"root:$pw"
 		pw=$pwa
-		chpasswd -S <<<"$chpw"
+		chpasswd <<<"$chpw"
 		chpw=$(printf %${#chpw}s)
 		addgroup $username sudo
 		((lmde)) || passwd -l root

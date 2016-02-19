@@ -1,6 +1,6 @@
 
 # lmdescrypt
-### version 0.81
+### version 0.82
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504)
