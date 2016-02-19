@@ -2,7 +2,7 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.78
+#  lmdescrypt 0.79
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504)
@@ -106,7 +106,7 @@ crypt_label=crypt
 boot_label=boot
 root_label=root
 swap_label=swap
-data_label=data
+data_label=
 
 ### Make sure you're not allotting more space than what's available, and enough for root (6GB at least)!
 ## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points or spaces, like: 10G or 200M
