@@ -2,12 +2,11 @@
 set +o xtrace -o verbose -o errexit -o errtrace
 ############################################################################
 #
-#  lmdescrypt 0.84
+#  lmdescrypt 0.85
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
-#  or Linux Mint Debian Edition version 2 (201504)
-#  or regular Linux Mint 17.1 or 17.2 or 17.3 to be:
-#  Fully luks encrypted, with lvm2 volumes of root, swap and (optionally) data.
+#  or Linux Mint Debian Edition version 2 (201504), or regular Linux Mint 17.1 or 17.2 or 17.3 to be:
+#  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
 #
 # Github page: https://github.com/pepa65/lmdescrypt
 #
@@ -67,12 +66,13 @@ set +o xtrace -o verbose -o errexit -o errtrace
 ## - about the keyboard
 ## - about the timezone
 ##
+### And that's it!
+##
+##
 ### Installing into a pre-existing environment
 ## Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
 ## The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
 ##
-### And that's it!
-#
 ############################################################################
 
 ############################################################################
@@ -202,7 +202,7 @@ then  ## Inside the chroot of the new system on /target
 				echo
 				[[ "$pw" = "$pwa" ]] && setting_pw=0 || echo -e "Passwords not the same, do it again!\n"
 			else
-				echo -e "\nPassword can't be empty!"
+				echo "Password can't be empty!"
 			fi
 		done
 		pwa=$(printf %${#pw}s)
