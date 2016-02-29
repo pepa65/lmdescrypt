@@ -1,6 +1,6 @@
 
 # lmdescrypt
-### version 0.85
+### version 0.86
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504), or regular Linux Mint 17.1 or 17.2 or 17.3 to be:<br>
@@ -17,7 +17,7 @@ Questions?  solusos@passchier.net or post an Issue on the github page
 
 **1. Boot the Live environment**
 
-**2. Open a Terminal (Menu, Terminal) and enter:**
+**2. Open a Terminal (Menu/Terminal of Ctrl-Alt-T) and enter:**
 
 ```
 wget j.mp/lmdescrypt
