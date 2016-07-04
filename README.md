@@ -1,6 +1,6 @@
 
 # lmdescrypt
-### version 0.86
+### version 0.87
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504), or regular Linux Mint 17.1 or 17.2 or 17.3 to be:<br>
@@ -30,7 +30,9 @@ chmod +x lmdescrypt
 nano lmdescrypt
 ```
 
-**4. Partition the drive, for instance (taking up all space):**
+**4. Make sure all the partitions mentioned in SETTINGS exist.**
+For example, (re)partition the drive like this
+(erasing all, taking up all space):
 
 ```
 sudo fdisk /dev/sda
