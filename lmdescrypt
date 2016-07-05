@@ -278,7 +278,7 @@ fi
 ## Set swap size
 if [[ $swap_size = DEFAULT ]]
 then
-	lvm_swap="-L $(cat /sys/power/image_size) -Cy -Zy"
+	lvm_swap="-L $(cat /sys/power/image_size)B -Cy -Zy"
 else
 	if ! [[ $swap_size = EXISTING ]]
 	then
@@ -322,7 +322,7 @@ crypt_dev="/dev/mapper/$crypt_label"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
 ## Make lvm2 volumes if not there yet and format if wanted
-[[ "  $crypt_label" = $(vgs --noheadings -o vg_name) ]] || vgcreate -Zy $crypt_label $crypt_dev
+[[ "  $crypt_label" = "$(vgs --noheadings -o vg_name)" ]] || vgcreate -Zy $crypt_label $crypt_dev
 vgchange --refresh
 root_dev="/dev/$crypt_label/$root_label"
 data_dev="/dev/$crypt_label/$data_label"
