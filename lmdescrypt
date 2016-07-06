@@ -3,13 +3,13 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.88
+#  lmdescrypt 0.89
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
-#  or Linux Mint Debian Edition version 2 (201504), or
-#  regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:
+#  or Linux Mint Debian Edition version 2 (201504),
+#  or regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:
 #  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
-# Only works with non-UEFI so far!
+# The script doesn't work with UEFI-installs yet!
 #
 # Github page: https://github.com/pepa65/lmdescrypt
 #
@@ -23,6 +23,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ## - SETTINGS to be adjusted
 ## - FUNCTIONS
 ## - INIT
+## - CHROOT
 ## - MAIN
 ############################################################################
 
@@ -34,12 +35,13 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ##
 ### 2. Open a Terminal (Menu/Terminal of Ctrl-Alt-T) and enter:
 ##  wget j.mp/lmdescrypt
-##  chmod +x lmdescrypt
 ##
 ### 3. If needed, adapt the SETTINGS section:
 ##  nano lmdescrypt
 ##
-### 4. Partition the drive, for instance (taking up all space):
+### 4. Make sure all the partitions mentioned in SETTINGS exist
+## For example, (re)partition the drive like this
+##  (erasing all, taking up all space):
 ##
 ##  sudo fdisk /dev/sda
 ##  o [Enter]
@@ -59,21 +61,23 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ##
 ### 5. Start the script:
 ##
+##  chmod +x lmdescrypt
 ##  sudo ./lmdescrypt
 ##
 ### 6. Answer the questions as they come up:
 ## - password for encryption (twice the same)
 ## - password for decryption (same again)
 ## Then after a wait for all the preparations to have happened:
-## - password for user, and some irrelevant info
-## - about the keyboard
-## - about the timezone
+## - set password for user
+## - configure keyboard
+## - set timezone
 ##
 ### And that's it!
 ##
 ##
 ### Installing into a pre-existing environment
 ## Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
+## Not having a separate boot partition is also supported: total encryption!
 ## The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
 ##
 ############################################################################
@@ -83,10 +87,11 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ############################################################################
 ## Review all settings below
 
-### Adjust if needed (not needed if following the suggested partitioning)
+## Adjust if needed (not needed if following the suggested partitioning)
 ## Specify the partitions you created by any valid device path, like:
 ## /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
-boot_part=/dev/sda1
+### Partitions to use (total encryption: boot_part should be empty)
+boot_part=
 crypt_part=/dev/sda2
 
 ## Adjust only if you already have a LUKS encrypted partition that you want to wipe and start from scratch
@@ -104,16 +109,16 @@ force_random=0
 ## The data_label will also be the name of the mountpoint
 ## If empty, the default NAME (in NAME_label) will be used
 ### Filesystem labels (no spaces):
-crypt_label=
-boot_label=
-root_label=
-swap_label=
-data_label=
+crypt_label=crypt
+boot_label=boot
+root_label=root
+swap_label=swap
+data_label=data
 
 ## Don't allot more space than available, and at least 6GB for root
 ## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points or spaces, like: 10G or 200M
 ## - if empty (only for swap or data) it will NOT BE USED
-## - if EXISTING then the Logical Volume will need to exist already
+## - if EXISTING then the Logical Volume will not be created and needs to exist already
 ##   (and so should the Volume Group then!)
 ## - if REST (only for root or data, not both) then the rest of the available space will be used
 ## - DEFAULT (only for swap) means 40% of RAM size (/sys/power/image_size)
@@ -175,6 +180,12 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 	esac
 }
 
+Checklabel(){ ## $1: labelname
+	$label="$1_label"
+	$content=$(eval "echo \$$label")
+	[[ $content = ${content/ } ]] || Exit "Label $label contains spaces: '$content'"
+}
+
 ############################################################################
 #### INIT
 ############################################################################
@@ -185,21 +196,22 @@ self=$(basename $cself)
 ((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
 [[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!"
 
-## The chroot invocation
+############################################################################
+##### CHROOT
+############################################################################
+
 if [[ $1 = inside ]]
 then  ## Inside the chroot of the new system on /target
 		((lmde)) && [[ -d /lib/live/mount ]] && Exit "Not in chroot, can't call 'inside': $self $*"
 		! ((lmde)) && [[ -d /cdrom ]] && Exit "Not in chroot, can't call 'inside': $self $*"
-		username=$2
-		grub_device=$3
-		lmde=$4
-		shift 4
+		lmde=$2
+		shift 2
 		packages=$*
 		mount -t sysfs sys /sys
 		mount -t proc proc /proc
 		mount -t devpts pts /dev/pts
 		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-		locale-gen --purge $LANGUAGE
+		locale-gen --purge --no-archive
 		useradd -ms /bin/bash $username
 		pw="" pwa="" setting_pw=1
 		while ((setting_pw))
@@ -228,10 +240,11 @@ then  ## Inside the chroot of the new system on /target
 		dpkg-reconfigure tzdata
 		apt-get update
 		rm -f /initrd.img
-		[[ "$packages" ]] && apt-get --yes --force-yes --reinstall install $packages
+		[[ "$packages" ]] && apt-get --yes --reinstall install $packages
 		((lmde)) && apt-get --yes purge '^live-.*'
+		pvscan --cache
 		update-grub
-		grub-install --recheck --force "$grub_device"
+		grub-install --force --recheck "$grub_device"
 		gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 		((lmde)) && rm -rvf /lib/live
 		umount /dev/pts
@@ -240,25 +253,25 @@ then  ## Inside the chroot of the new system on /target
 		exit 0
 fi
 
+############################################################################
+#### MAIN
+############################################################################
+
 ## Check existence of mandatory devices
-[[ -w "$boot_part" ]] || Exit "Boot device does not exist or is not writable: '$boot_part'"
 [[ -w "$crypt_part" ]] || Exit "Crypt device does not exist or is not writable: '$crypt_part'"
 [[ -w "$grub_device" ]] || Exit "Grub device does not exist or is not writable: '$grub_device'"
 
-## Check names and labels
+## Check names, labels, root_fs
 [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] || Exit "Illegal format for username: '$username'"
 [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] || Exit "Illegal format for hostname: '$hostname'"
-[[ $crypt_label ]] || crypt_label=crypt
-[[ $crypt_label = "${crypt_label/ /}" ]] || Exit "Label crypt_label contains spaces: '$crypt_label'"
+Checklabel crypt || exit 1
 [[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable"
-[[ $boot_label ]] || boot_label=boot
-[[ $boot_label = "${boot_label/ /}" ]] || Exit "Label boot_label contains spaces: '$boot_label'"
-[[ $root_label ]] || root_label=root
-[[ $root_label = "${root_label/ /}" ]] || Exit "Label root_label contains spaces: '$root_label'"
-[[ $swap_label ]] || swap_label=swap
-[[ $swap_label = "${swap_label/ /}" ]] || Exit "Label swap_label contains spaces: '$swap_label'"
-[[ $data_label ]] || data_label=data
-[[ $data_label = "${data_label/ /}" ]] || Exit "Label data_label contains spaces: '$data_label'"
+Checklabel boot || exit 1
+Checklabel root || exit 1
+Checklabel swap || exit 1
+Checklabel data || exit 1
+! [[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
+		&& Exit "Wrong value for root_fs: '$root_fs'"
 
 ## Determine root and data partition usage & size
 [[ $root_size ]] && ! [[ $root_size = REST ]] && ! [[ $root_size = EXISTING ]] \
@@ -270,7 +283,7 @@ then
 	lvm_data='-l 100%FREE -Zy'
 else
 	if [[ $data_size ]]
-	then  ## not REST but not empty
+	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] \
 				&& Exit "Invalid format data_size: '$data_size'"
 		lvm_data="-L $data_size -Zy"
@@ -303,11 +316,6 @@ else  ## regular Mint
 	rofs=$rofslm
 fi
 
-
-############################################################################
-#### MAIN
-############################################################################
-
 ## Encrypt
 if ((force_reencrypt))
 then
@@ -334,9 +342,11 @@ swap_dev="/dev/$crypt_label/$swap_label"
 if [[ $swap_size ]]
 then
 	! [[ -h $swap_dev ]] && lvcreate $lvm_swap -n $swap_label $crypt_label
-	[[ $swap_fs = swap ]] && mkswap -f -L $swap_label "$swap_dev"
+	[[ $swap_fs = swap ]] && mkswap -f -L $swap_label "$swap_dev" \
+			|| Exit "Wrong value for swap_fs: '$swap_fs'" 
 fi
 
+## Create and format root partition, and data partition if wanted
 ! [[ $root_size = REST ]] && ! [[ -h $root_dev ]] && lvcreate -L $root_size -Zy -n $root_label $crypt_label
 if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
@@ -352,9 +362,6 @@ then  ## Create if it doesn't exist and format if required
 	fi
 fi
 [[ $root_size = REST ]] && ! [[ -h $root_dev ]] && lvcreate -l 100%FREE -Zy -n $root_label $crypt_label
-
-! [[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-		&& Exit "Wrong value for root_fs: '$root_fs'"
 if [[ $root_fs ]]
 then
 	Mkfs "$root_fs" "$root_label" "$root_dev" root
@@ -366,26 +373,39 @@ else
 			&& Exit "Root partition has unsupported filesystem: $root_fs"
 fi
 
-! [[ $boot_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-		&& Exit "Wrong value for boot_fs: '$boot_fs'"
-if [[ $boot_fs ]]
+if [[ $boot_part ]]
 then
-	Mkfs "$boot_fs" "$boot_label" "$boot_part" boot
-else
-	boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
-	! [[ $boot_fs ]] \
-			&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs'"
+	! [[ $boot_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
+			&& Exit "Wrong value for boot_fs: '$boot_fs'"
+	if [[ $boot_fs ]]
+	then
+		Mkfs "$boot_fs" "$boot_label" "$boot_part" boot
+	else
+		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
+		! [[ $boot_fs ]] \
+				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty"
+	fi
+	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
-boot_uuid=$(blkid -s UUID -o value "$boot_part")
 
 ## Mount
-[[ $swap_size ]] && swapon "$swap_dev"
-swapon -s
+[[ $swap_size ]] && swapon "$swap_dev" && swapon -s
 target='/target'
 mkdir -p "$target"
 mount "$root_dev" "$target"
-mkdir -p "$target/boot"
-mount "$boot_part" "$target/boot"
+if [[ $boot_part ]]
+then
+	mkdir -p "$target/boot"
+	mount "$boot_part" "$target/boot"
+else
+	keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
+	key=crypto_keyfile.bin
+	dd bs=512 count=4 if=/dev/urandom of="$target/$key"
+	cryptsetup luksAddKey "$crypt_label" "$target/$key"
+	chmod 000 "$target/$key"
+	echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
+	chmod +x "$keytarget"
+fi
 if [[ $data_size ]]
 then
 	mkdir -p "$target/$data_label"
@@ -397,12 +417,10 @@ df --sync -hlT -x tmpfs -x devtmpfs
 cp -a "$rofs"/* "$target"
 
 ## Prepare root
-cat <<-END >"$target/etc/fstab"
-	proc /proc proc defaults 0 0
-	$swap_dev $swap_label swap sw 0 0
-	$root_dev / $root_fs relatime,errors=remount-ro 0 1
-	UUID=$boot_uuid /boot $boot_fs relatime 0 2
-END
+echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
+echo "$root_dev / $root_fs relatime,errors=remount-ro 0 1" >>"$target/etc/fstab"
+[[ $swap_size ]] && echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
+[[ $boot_part ]] && echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
 [[ $data_size ]] && echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
@@ -418,7 +436,7 @@ mount --bind /dev "$target/dev"
 chroot "$target" "/root/$self" inside $username $grub_device $lmde $packages
 
 umount "$target/dev"
-umount "$target/boot"
+[[ $boot_part ]] && umount "$target/boot"
 [[ $data_size ]] && umount "$target/$data_label"
 umount "$target"
 [[ $swap_size ]] && swapoff "$swap_dev"
