@@ -3,12 +3,13 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.87
+#  lmdescrypt 0.88
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504), or
 #  regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:
 #  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
+# Only works with non-UEFI so far!
 #
 # Github page: https://github.com/pepa65/lmdescrypt
 #
@@ -182,6 +183,7 @@ cself=$BASH_SOURCE
 rself=$(readlink -e $cself)
 self=$(basename $cself)
 ((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
+[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!"
 
 ## The chroot invocation
 if [[ $1 = inside ]]
