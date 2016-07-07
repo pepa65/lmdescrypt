@@ -201,55 +201,55 @@ self=$(basename $cself)
 
 if [[ $1 = inside ]]
 then  ## Inside the chroot of the new system on /target
-		((lmde)) && [[ -d /lib/live/mount ]] && Exit "Not in chroot, can't call 'inside': $self $*"
-		! ((lmde)) && [[ -d /cdrom ]] && Exit "Not in chroot, can't call 'inside': $self $*"
-		lmde=$2
-		shift 2
-		packages=$*
-		mount -t sysfs sys /sys
-		mount -t proc proc /proc
-		mount -t devpts pts /dev/pts
-		export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-		locale-gen --purge --no-archive
-		useradd -ms /bin/bash $username
-		pw="" pwa="" setting_pw=1
-		while ((setting_pw))
-		do
-			pw=$(/lib/cryptsetup/askpass "Enter password for user $username: ")
+	((lmde)) && [[ -d /lib/live/mount ]] && Exit "Not in chroot, can't call 'inside': $self $*"
+	! ((lmde)) && [[ -d /cdrom ]] && Exit "Not in chroot, can't call 'inside': $self $*"
+	lmde=$2
+	shift 2
+	packages=$*
+	mount -t sysfs sys /sys
+	mount -t proc proc /proc
+	mount -t devpts pts /dev/pts
+	export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
+	locale-gen --purge --no-archive
+	useradd -ms /bin/bash $username
+	pw="" pwa="" setting_pw=1
+	while ((setting_pw))
+	do
+		pw=$(/lib/cryptsetup/askpass "Enter password for user $username: ")
+		echo
+		if [[ "$pw" ]]
+		then
+			pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
 			echo
-			if [[ "$pw" ]]
-			then
-				pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
-				echo
 				[[ "$pw" = "$pwa" ]] && setting_pw=0 || echo -e "Passwords not the same, do it again!\n"
-			else
-				echo "Password can't be empty!"
-			fi
-		done
-		pwa=$(printf %${#pw}s)
-		chpw="$username:$pw"
-		((lmde)) && chpw="$chpw"$'\n'"root:$pw"
-		pw=$pwa
-		chpasswd <<<"$chpw"
-		chpw=$(printf %${#chpw}s)
-		addgroup $username sudo
-		((lmde)) || passwd -l root
-		dpkg --configure -a
-		dpkg-reconfigure keyboard-configuration
-		dpkg-reconfigure tzdata
-		apt-get update
-		rm -f /initrd.img
-		[[ "$packages" ]] && apt-get --yes --reinstall install $packages
-		((lmde)) && apt-get --yes purge '^live-.*'
-		pvscan --cache
-		update-grub
-		grub-install --force --recheck "$grub_device"
-		gconftool-2 --set /apps/gksu/sudo-mode --type bool true
-		((lmde)) && rm -rvf /lib/live
-		umount /dev/pts
-		umount /proc
-		umount /sys
-		exit 0
+		else
+			echo "Password can't be empty!"
+		fi
+	done
+	pwa=$(printf %${#pw}s)
+	chpw="$username:$pw"
+	((lmde)) && chpw="$chpw"$'\n'"root:$pw"
+	pw=$pwa
+	chpasswd <<<"$chpw"
+	chpw=$(printf %${#chpw}s)
+	addgroup $username sudo
+	((lmde)) || passwd -l root
+	dpkg --configure -a
+	dpkg-reconfigure keyboard-configuration
+	dpkg-reconfigure tzdata
+	apt-get update
+	rm -f /initrd.img
+	[[ "$packages" ]] && apt-get --yes --reinstall install $packages
+	((lmde)) && apt-get --yes purge '^live-.*'
+	pvscan --cache
+	update-grub
+	grub-install --force --recheck "$grub_device"
+	gconftool-2 --set /apps/gksu/sudo-mode --type bool true
+	((lmde)) && rm -rvf /lib/live
+	umount /dev/pts
+	umount /proc
+	umount /sys
+	exit 0
 fi
 
 ############################################################################
