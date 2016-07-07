@@ -328,7 +328,7 @@ if ! [[ $boot_part ]]
 then
 	key=crypto_keyfile.bin
 	dd bs=512 count=4 if=/dev/urandom of="$key"
-	cryptsetup luksAddKey "$crypt_label" "$key"
+	cryptsetup luksAddKey "$crypt_part" "$key"
 fi
 
 ## Decrypt if not yet mapped
