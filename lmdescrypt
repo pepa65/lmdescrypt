@@ -403,12 +403,6 @@ if [[ $boot_part ]]
 then
 	mkdir -p "$target/boot"
 	mount "$boot_part" "$target/boot"
-else
-	keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
-	mv "$key" "$target/$key"
-	chmod 000 "$target/$key"
-	echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
-	chmod +x "$keytarget"
 fi
 if [[ $data_size ]]
 then
@@ -424,8 +418,17 @@ cp -a "$rofs"/* "$target"
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
 echo "$root_dev / $root_fs relatime,errors=remount-ro 0 1" >>"$target/etc/fstab"
 [[ $swap_size ]] && echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
-[[ $boot_part ]] && echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
 [[ $data_size ]] && echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
+if [[ $boot_part ]]
+then
+	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
+else
+	keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
+	mv "$key" "$target/$key"
+	chmod 000 "$target/$key"
+	echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
+	chmod +x "$keytarget"
+fi
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
@@ -437,7 +440,7 @@ cp "$rself" "$target/root/$self"
 mount --bind /dev "$target/dev"
 
 ## Enter the fresh installation to finish up
-chroot "$target" "/root/$self" inside $username $grub_device $lmde $packages
+chroot "$target" "/root/$self" inside $lmde $packages
 
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
