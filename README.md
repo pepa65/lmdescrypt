@@ -64,8 +64,7 @@ sudo ./lmdescrypt
 ```
 
 **6. Answer the questions as they come up:**
-* password for encryption (twice the same)
-* password for decryption (same again)
+* password for encryption (three or four times, depending!)
 
 Then after a wait for all the preparations to have happened, and supply:
 * set password for user
