@@ -3,7 +3,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.89
+#  lmdescrypt 0.90
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504),
@@ -49,15 +49,10 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ##    [Enter]
 ##    [Enter]
 ##    [Enter]
-##  +500M [Enter]
-##  n [Enter]
-##    [Enter]
-##    [Enter]
-##    [Enter]
 ##    [Enter]
 ##  w [Enter]
 ##
-## (This is making a 500 MB boot partition, and giving the rest to the encrypted lvm2)
+## (This is giving all space to the encrypted lvm2)
 ##
 ### 5. Start the script:
 ##
@@ -65,7 +60,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ##  sudo ./lmdescrypt
 ##
 ### 6. Answer the questions as they come up:
-## - password for encryption (three or four times, depending!)
+## - password for encryption (three or four times, all the same one!)
 ## Then after a wait for all the preparations to have happened:
 ## - set password for user
 ## - configure keyboard
@@ -91,7 +86,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ## /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
 ### Partitions to use (total encryption: boot_part should be empty)
 boot_part=
-crypt_part=/dev/sda2
+crypt_part=/dev/sda1
 
 ## Adjust only if you already have a LUKS encrypted partition that you want to wipe and start from scratch
 ### Wipe the crypt-partition before setup, even if already set up, if 1:
@@ -206,10 +201,12 @@ then  ## Inside the chroot of the new system on /target
 	lmde=$2
 	shift 2
 	packages=$*
+	lvmetad
 	mount -t sysfs sys /sys
 	mount -t proc proc /proc
 	mount -t devpts pts /dev/pts
 	export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
+	pvscan --cache
 	locale-gen --purge --no-archive
 	useradd -ms /bin/bash $username
 	pw="" pwa="" setting_pw=1
@@ -241,7 +238,6 @@ then  ## Inside the chroot of the new system on /target
 	rm -f /initrd.img
 	[[ "$packages" ]] && apt-get --yes --reinstall install $packages
 	((lmde)) && apt-get --yes purge '^live-.*'
-	pvscan --cache
 	update-grub
 	grub-install --force --recheck "$grub_device"
 	gconftool-2 --set /apps/gksu/sudo-mode --type bool true
@@ -427,7 +423,12 @@ else
 	chmod 000 "$target/$key"
 	echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
 	chmod +x "$keytarget"
+	sed -i '/^GRUB_TIMEOUT/a ENABLE_CRYPTODISK=y' "$target/etc/default/grub"
+	gcl="GRUB_CMDLINE_LINUX=\"cryptdevice=$crypt_part:$crypt_label\""
+	sed -i "s@^GRUB_CMDLINE_LINUX=\"\"@$gcl@" "$target/etc/default/grub"
 fi
+sed -i 's/^GRUB_TIMEOUT=10/GRUB_TIMEOUT=4/' "$target/etc/default/grub"
+sed -i 's/^GRUB_HIDDEN_TIMEOUT=0/#GRUB_HIDDEN_TIMEOUT=0/' "$target/etc/default/grub"
 echo "$crypt_label UUID=$crypt_uuid none luks" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 sed "s/mint/$username/g" /etc/mdm/mdm.conf >"$target/etc/mdm/mdm.conf"
