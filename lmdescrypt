@@ -180,8 +180,8 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 }
 
 Checklabel(){ ## $1: labelname
-	$label="$1_label"
-	$content=$(eval "echo \$$label")
+	label="$1_label"
+	content=$(eval "echo \$$label")
 	[[ $content = ${content/ } ]] || Exit "Label $label contains spaces: '$content'"
 }
 
