@@ -206,7 +206,7 @@ then  ## Inside the chroot of the new system on /target
 	lmde=$2
 	shift 2
 	packages=$*
-	lvmetad
+	lvmetad -p /pid
 	mount -t sysfs sys /sys
 	mount -t proc proc /proc
 	mount -t devpts pts /dev/pts
@@ -250,6 +250,7 @@ then  ## Inside the chroot of the new system on /target
 	umount /dev/pts
 	umount /proc
 	umount /sys
+	kill -9 $(cat /pid)
 	exit 0
 fi
 
