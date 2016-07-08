@@ -1,6 +1,6 @@
 
 # lmdescrypt
-### version 0.90
+### version 0.91
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201504),
@@ -79,5 +79,7 @@ Then after a wait for all the preparations to have happened, and supply:
 Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
 
 Not having a separate boot partition is also supported: total encryption!
+
+Multiple booting with other OSes also works out of the box.
 
 The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.

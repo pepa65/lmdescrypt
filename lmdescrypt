@@ -3,7 +3,9 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.90
+#  lmdescrypt 0.91
+#
+# Shortlink to download the script: http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 #  or Linux Mint Debian Edition version 2 (201504),
@@ -11,20 +13,22 @@ set +o xtrace +o verbose -o errexit -o errtrace
 #  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
 # The script doesn't work with UEFI-installs yet!
 #
-# Github page: https://github.com/pepa65/lmdescrypt
+# Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
 #
 # See forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
-# Shortlink to download the script: http://j.mp/lmdescrypt
+#
+# Github page: https://github.com/pepa65/lmdescrypt
+#
 # Questions? Email solusos@passchier.net or post an Issue on the github page.
 #
 ############################################################################
 ### CONTENTS:
 ## - INSTRUCTIONS for preparation and use
 ## - SETTINGS to be adjusted
-## - FUNCTIONS
-## - INIT
-## - CHROOT
-## - MAIN
+## - FUNCTIONS used internally
+## - INIT before anything happens
+## - CHROOT to finalize the installation
+## - MAIN action
 ############################################################################
 
 ############################################################################
@@ -72,6 +76,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ### Installing into a pre-existing environment
 ## Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
 ## Not having a separate boot partition is also supported: total encryption!
+## Multiple booting with other OSes also works out of the box.
 ## The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
 ##
 ############################################################################
