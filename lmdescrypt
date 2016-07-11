@@ -3,7 +3,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.91
+#  lmdescrypt 0.92
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
