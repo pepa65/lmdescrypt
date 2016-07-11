@@ -3,7 +3,7 @@
 ### version 0.91
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
-or Linux Mint Debian Edition version 2 (201504),
+or Linux Mint Debian Edition version 2 (201503),
 or regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:<br>
 *Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data).*
 
