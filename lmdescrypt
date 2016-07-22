@@ -3,7 +3,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.92
+#  lmdescrypt 0.93
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -201,9 +201,9 @@ self=$(basename $cself)
 
 if [[ $1 = inside ]]
 then  ## Inside the chroot of the new system on /target
+	lmde=$2
 	((lmde)) && [[ -d /lib/live/mount ]] && Exit "Not in chroot, can't call 'inside': $self $*"
 	! ((lmde)) && [[ -d /cdrom ]] && Exit "Not in chroot, can't call 'inside': $self $*"
-	lmde=$2
 	shift 2
 	packages=$*
 	lvmetad -p /pid
