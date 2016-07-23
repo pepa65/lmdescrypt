@@ -3,7 +3,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 
 ############################################################################
 #
-#  lmdescrypt 0.93
+#  lmdescrypt 0.93a
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -189,9 +189,8 @@ Checklabel(){ ## $1: labelname
 #### INIT
 ############################################################################
 
-cself=$BASH_SOURCE
-rself=$(readlink -e $cself)
-self=$(basename $cself)
+rself=$(readlink -e $BASH_SOURCE)
+self=$(basename $BASH_SOURCE)
 ((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
 [[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!"
 
