@@ -1,9 +1,10 @@
 #!/bin/bash
-set +o xtrace +o verbose -o errexit -o errtrace
+set +o xtrace +o verbose +o errexit -o errtrace
+trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 
 ############################################################################
 #
-#  lmdescrypt 0.93a
+#  lmdescrypt 0.94
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -12,6 +13,8 @@ set +o xtrace +o verbose -o errexit -o errtrace
 #  or regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:
 #  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
 # The script doesn't work with UEFI-installs yet!
+#
+# Shortlink to download the script: http://j.mp/lmdescrypt
 #
 # Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
 #
@@ -26,8 +29,6 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ## - INSTRUCTIONS for preparation and use
 ## - SETTINGS to be adjusted
 ## - FUNCTIONS used internally
-## - INIT before anything happens
-## - CHROOT to finalize the installation
 ## - MAIN action
 ############################################################################
 
@@ -38,30 +39,30 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ### 1. Boot the Live environment
 ##
 ### 2. Open a Terminal (Menu/Terminal of Ctrl-Alt-T) and enter:
-##  wget j.mp/lmdescrypt
+##> sudo -i
+##> wget j.mp/lmdescrypt
 ##
 ### 3. If needed, adapt the SETTINGS section:
-##  nano lmdescrypt
+##> nano lmdescrypt
 ##
 ### 4. Make sure all the partitions mentioned in SETTINGS exist
 ## For example, (re)partition the drive like this
 ##  (erasing all, taking up all space):
 ##
-##  sudo fdisk /dev/sda
+##> fdisk /dev/sda
 ##  o [Enter]
 ##  n [Enter]
-##    [Enter]
-##    [Enter]
-##    [Enter]
-##    [Enter]
+##  [Enter]
+##  [Enter]
+##  [Enter]
+##  [Enter]
 ##  w [Enter]
 ##
 ## (This is giving all space to the encrypted lvm2)
 ##
 ### 5. Start the script:
 ##
-##  chmod +x lmdescrypt
-##  sudo ./lmdescrypt
+##> source lmdescrypt
 ##
 ### 6. Answer the questions as they come up:
 ## - password for encryption (three or four times, all the same one!)
@@ -84,7 +85,7 @@ set +o xtrace +o verbose -o errexit -o errtrace
 ############################################################################
 #### SETTINGS
 ############################################################################
-## Review all settings below
+### Review all settings in this section
 
 ## Adjust if needed (not needed if following the suggested partitioning)
 ## Specify the partitions you created by any valid device path, like:
@@ -108,11 +109,11 @@ force_random=0
 ## The data_label will also be the name of the mountpoint
 ## If empty, the default NAME (in NAME_label) will be used
 ### Filesystem labels (no spaces):
-crypt_label=crypt
-boot_label=boot
-root_label=root
-swap_label=swap
-data_label=data
+crypt_label=
+boot_label=
+root_label=
+swap_label=
+data_label=
 
 ## Don't allot more space than available, and at least 6GB for root
 ## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points or spaces, like: 10G or 200M
@@ -130,7 +131,7 @@ data_size=
 ## Adjust if re-using preexisting boot or data volumes!
 ## Fill in the desired filesystem-type, empty means it will NOT BE FORMATTED!
 ##  (pre-existing filesystem will be kept!)
-## Supported for boot and root: ext2 ext3 ext4 reiserfs xfs, for swap: swap
+## Supported for boot and root: ext2 ext3 ext4 reiserfs xfs; for swap: swap
 ## Supported for data: ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
 ### Filesystems:
 boot_fs=ext4
@@ -160,12 +161,21 @@ packages=''
 #### FUNCTIONS
 ############################################################################
 
-Exit(){	echo -e "  ERROR: $1\n  ABORTING"; exit 1;}
+Echo(){ ## $1=message
+	echo -e '_______________________________________________________________________________\n'
+	echo -e "  $1"
+	echo -e '_______________________________________________________________________________\n'
+}
+
+## Needs to be followed by 'return' in the main body!
+Exit(){ ## $1=message
+	Echo "  ERROR: $1\n  ABORTING";
+}
 
 Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 	case $1 in
-		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) ! [[ $4 = data ]] && Exit "A $1 filesystem is not supported on $4" ;;&
-		## Continue even if the above pattern matched
+		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) ! [[ $4 = data ]] && return 1 ;;&
+		## Continue even if the above pattern matched (unless $4 isn't data)
 		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
 		hfs) mkfs.$1 -h -v "$2" "$3" ;;
 		hfsplus) mkfs.$1 -J -v "$2" "$3" ;;
@@ -175,117 +185,56 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 		ntfs) mkfs.$1 -f -F -U -L "$2" "$3" ;;
 		reiserfs) mkfs.$1 -ffl "$2" "$3" ;;
 		xfs) mkfs.$1 -f -L "$2" "$3" ;;
-		*) Exit "Unsupported filesystem $1 for $4-device $3 with label $2" ;;
+		*) return 2 ;;
 	esac
 }
 
 Checklabel(){ ## $1: labelname
 	label="$1_label"
 	content=$(eval "echo \$$label")
-	[[ $content = ${content/ } ]] || Exit "Label $label contains spaces: '$content'"
+	[[ $content ]] || eval "$label=$1"
+	! [[ $content = ${content/ } ]] \
+			&& Exit "Label $label contains spaces: '$content'"
 }
-
-############################################################################
-#### INIT
-############################################################################
-
-rself=$(readlink -e $BASH_SOURCE)
-self=$(basename $BASH_SOURCE)
-((EUID)) && Exit "This script only works when run with root privileges, like: sudo $BASH_SOURCE"
-[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!"
-
-############################################################################
-##### CHROOT
-############################################################################
-
-if [[ $1 = inside ]]
-then  ## Inside the chroot of the new system on /target
-	lmde=$2
-	((lmde)) && [[ -d /lib/live/mount ]] && Exit "Not in chroot, can't call 'inside': $self $*"
-	! ((lmde)) && [[ -d /cdrom ]] && Exit "Not in chroot, can't call 'inside': $self $*"
-	shift 2
-	packages=$*
-	lvmetad -p /pid
-	mount -t sysfs sys /sys
-	mount -t proc proc /proc
-	mount -t devpts pts /dev/pts
-	export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-	pvscan --cache
-	locale-gen --purge --no-archive
-	useradd -ms /bin/bash $username
-	pw="" pwa="" setting_pw=1
-	while ((setting_pw))
-	do
-		pw=$(/lib/cryptsetup/askpass "Enter password for user $username: ")
-		echo
-		if [[ "$pw" ]]
-		then
-			pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
-			echo
-				[[ "$pw" = "$pwa" ]] && setting_pw=0 || echo -e "Passwords not the same, do it again!\n"
-		else
-			echo "Password can't be empty!"
-		fi
-	done
-	pwa=$(printf %${#pw}s)
-	chpw="$username:$pw"
-	((lmde)) && chpw="$chpw"$'\n'"root:$pw"
-	pw=$pwa
-	chpasswd <<<"$chpw"
-	chpw=$(printf %${#chpw}s)
-	addgroup $username sudo
-	((lmde)) || passwd -l root
-	dpkg --configure -a
-	dpkg-reconfigure keyboard-configuration
-	dpkg-reconfigure tzdata
-	apt-get update
-	rm -f /initrd.img
-	[[ "$packages" ]] && apt-get --yes --reinstall install $packages
-	((lmde)) && apt-get --yes purge '^live-.*'
-	update-grub
-	grub-install --force --recheck "$grub_device"
-	gconftool-2 --set /apps/gksu/sudo-mode --type bool true
-	((lmde)) && rm -rvf /lib/live
-	umount /dev/pts
-	umount /proc
-	umount /sys
-	kill -9 $(cat /pid)
-	exit 0
-fi
 
 ############################################################################
 #### MAIN
 ############################################################################
 
+self=$(basename $BASH_SOURCE)
+[[ $- != *i* ]] && Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING" && return 1
+((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 2
+[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 3
+
 ## Check existence of mandatory devices
-[[ -w "$crypt_part" ]] || Exit "Crypt device does not exist or is not writable: '$crypt_part'"
-[[ -w "$grub_device" ]] || Exit "Grub device does not exist or is not writable: '$grub_device'"
+! [[ -w "$crypt_part" ]] && Exit "Crypt device does not exist or is not writable: '$crypt_part'" && return 4
+! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 5
 
 ## Check names, labels, root_fs
-[[ $username =~ ^[a-z_][a-z0-9_]*$ ]] || Exit "Illegal format for username: '$username'"
-[[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] || Exit "Illegal format for hostname: '$hostname'"
-Checklabel crypt || exit 1
-[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable"
-Checklabel boot || exit 1
-Checklabel root || exit 1
-Checklabel swap || exit 1
-Checklabel data || exit 1
+! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 6
+! [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] && Exit "Illegal format for hostname: '$hostname'" && return 7
+Checklabel crypt && return 8
+[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 9
+Checklabel boot && return 10
+Checklabel root && return 11
+Checklabel swap && return 12
+Checklabel data && return 13
 ! [[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-		&& Exit "Wrong value for root_fs: '$root_fs'"
+		&& Exit "Wrong value for root_fs: '$root_fs'" && return 14
 
 ## Determine root and data partition usage & size
 [[ $root_size ]] && ! [[ $root_size = REST ]] && ! [[ $root_size = EXISTING ]] \
 		&& ! [[ $root_size =~ [1-9][0-9]*[MG] ]] \
-		&& Exit "Invalid format root_size: '$root_size'"
+		&& Exit "Invalid format root_size: '$root_size'" && return 15
 if [[ $data_size = REST ]]
 then
-	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST"
+	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST" && return 16
 	lvm_data='-l 100%FREE -Zy'
 else
 	if [[ $data_size ]]
 	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format data_size: '$data_size'"
+				&& Exit "Invalid format data_size: '$data_size'" && return 17
 		lvm_data="-L $data_size -Zy"
 	fi
 fi
@@ -298,7 +247,7 @@ else
 	if ! [[ $swap_size = EXISTING ]]
 	then
 		[[ $swap_size ]] && ! [[ $swap_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format swap_size: $swap_size"
+				&& Exit "Invalid format swap_size: $swap_size" && return 18
 		lvm_swap="-L $swap_size -Cy -Zy"
 	fi
 fi
@@ -317,6 +266,7 @@ else  ## regular Mint
 fi
 
 ## Encrypt
+Echo "Enter encryption password (a number of times)"
 if ((force_reencrypt))
 then
 	((force_random)) && badblocks -c 10240 -s -w -t random -v "$crypt_part"
@@ -348,8 +298,11 @@ swap_dev="/dev/$crypt_label/$swap_label"
 if [[ $swap_size ]]
 then
 	! [[ -h $swap_dev ]] && lvcreate $lvm_swap -n $swap_label $crypt_label
-	[[ $swap_fs = swap ]] && mkswap -f -L $swap_label "$swap_dev" \
-			|| Exit "Wrong value for swap_fs: '$swap_fs'" 
+	if [[ $swap_fs ]]
+	then
+		! [[ $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" && return 19 \
+				|| mkswap -f -L $swap_label "$swap_dev"
+	fi
 fi
 
 ## Create and format root partition, and data partition if wanted
@@ -360,36 +313,39 @@ then  ## Create if it doesn't exist and format if required
 	then
 		data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
 		! [[ $data_fs ]] \
-				&& Exit "Data volume is not formatted; format first or fill in 'data_fs'"
+				&& Exit "Data volume is not formatted; format first or fill in 'data_fs'" && return 20
 	else
-		! [[ $data_fs ]] && Exit "Can't create data partition without format"
+		! [[ $data_fs ]] && Exit "Can't create data partition without format" && return 21
 		lvcreate $lvm_data -n $data_label $crypt_label
-		Mkfs "$data_fs" "$data_label" "$data_dev" data
+		! Mkfs "$data_fs" "$data_label" "$data_dev" data \
+				&& Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" && return 22
 	fi
 fi
 [[ $root_size = REST ]] && ! [[ -h $root_dev ]] && lvcreate -l 100%FREE -Zy -n $root_label $crypt_label
 if [[ $root_fs ]]
 then
-	Mkfs "$root_fs" "$root_label" "$root_dev" root
+	! Mkfs "$root_fs" "$root_label" "$root_dev" root \
+			&& Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" && return 23
 else
 	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
 	! [[ $root_fs ]] \
-			&& Exit "Root volume is not formatted; format first or fill in 'root_fs'"
+			&& Exit "Root volume is not formatted; format first or fill in 'root_fs'" && return 24
 	[[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs)$ ]] \
-			&& Exit "Root partition has unsupported filesystem: $root_fs"
+			&& Exit "Root partition has unsupported filesystem: $root_fs" && return 25
 fi
 
 if [[ $boot_part ]]
 then
 	! [[ $boot_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-			&& Exit "Wrong value for boot_fs: '$boot_fs'"
+			&& Exit "Wrong value for boot_fs: '$boot_fs'" && return 26
 	if [[ $boot_fs ]]
 	then
-		Mkfs "$boot_fs" "$boot_label" "$boot_part" boot
+		! Mkfs "$boot_fs" "$boot_label" "$boot_part" boot \
+				&& Exit "Unsupported filesystem $boot_fs for boot-device $boot_dev with label $boot_label" && return 27
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		! [[ $boot_fs ]] \
-				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty"
+				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty" && return 28
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
@@ -409,9 +365,9 @@ then
 	mkdir -p "$target/$data_label"
 	mount "$data_dev" "$target/$data_label"
 fi
-df --sync -hlT -x tmpfs -x devtmpfs
 
 ## Copy
+Echo "Copying takes a while..."
 cp -a "$rofs"/* "$target"
 
 ## Prepare root
@@ -445,11 +401,69 @@ echo $hostname >"$target/etc/hostname"
 echo "$LANG UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
-cp "$rself" "$target/root/$self"
+cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
 mount --bind /dev "$target/dev"
 
+## Prepare the chroot script
+inside="/root/$self.inside"
+(cat <<\X
+#!/bin/bash
+export PS1="\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]"
+lvmetad -p /pid
+mount -t sysfs sys /sys
+mount -t proc proc /proc
+mount -t devpts pts /dev/pts
+pvscan --cache
+locale-gen --purge --no-archive
+X
+echo "useradd -ms /bin/bash $username"
+cat <<\X
+pw="" pwa="" pw_set=0
+while ! ((pw_set))
+do
+	pw=$(/lib/cryptsetup/askpass "Enter user password: ")
+	echo
+	if [[ "$pw" ]]
+	then
+		pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
+		echo
+			[[ "$pw" = "$pwa" ]] && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+	else
+		echo "Empty password not allowed!"
+	fi
+done
+X
+echo "chpasswd <<<\"$username:\$pw\""
+((lmde)) && echo 'chpasswd <<<"root:$pw"'
+echo "addgroup $username sudo"
+((lmde)) || echo 'passwd -l root'
+cat <<X
+dpkg --configure -a
+dpkg-reconfigure keyboard-configuration
+dpkg-reconfigure tzdata
+apt-get update
+rm -f /initrd.img
+apt-get --yes --reinstall install $packages
+X
+((lmde)) && echo "apt-get --yes purge '^live-.*'" && echo 'rm -rvf /lib/live'
+cat <<X
+update-grub
+grub-install --force --recheck "$grub_device"
+X
+cat <<\X
+gconftool-2 --set /apps/gksu/sudo-mode --type bool true
+umount /dev/pts
+umount /proc
+umount /sys
+kill -9 $(cat /pid)
+exit 0
+X
+) >"$target$inside"
+chmod +x "$target$inside"
+
 ## Enter the fresh installation to finish up
-chroot "$target" "/root/$self" inside $lmde $packages
+Echo "Finalizing settings on the install"
+chroot "$target" "$inside"
 
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
@@ -464,6 +478,5 @@ sleep 1
 cryptsetup luksClose $crypt_label
 sync
 
-echo -e "\n  Ready for reboot!\n"
-
-exit 0
+Echo "Ready for reboot!"
+return 0

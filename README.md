@@ -1,6 +1,6 @@
 
 # lmdescrypt
-### version 0.93a
+### version 0.94
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201503),
@@ -9,11 +9,14 @@ or regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:<br>
 
 The script doesn't work with UEFI-installs yet!
 
+Shortlink to download the script: http://j.mp/lmdescrypt
+
+Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
+
+See also forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
+
 Github page: https://github.com/pepa65/lmdescrypt
 
-See forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
-
-Shortlink to download the script: http://j.mp/lmdescrypt<br>
 Questions?  solusos@passchier.net or post an Issue on the github page
 
 ## INSTRUCTIONS
@@ -23,6 +26,7 @@ Questions?  solusos@passchier.net or post an Issue on the github page
 **2. Open a Terminal (Menu/Terminal of Ctrl-Alt-T) and enter:**
 
 ```
+sudo -i
 wget j.mp/lmdescrypt
 ```
 
@@ -37,7 +41,7 @@ For example, (re)partition the drive like this
 (erasing all, taking up all space):
 
 ```
-sudo fdisk /dev/sda
+fdisk /dev/sda
 ```
 
 Within fdisk, enter the following:
@@ -47,21 +51,15 @@ Within fdisk, enter the following:
  [Enter]
  [Enter]
  [Enter]
- +500M [Enter]
- n [Enter]
- [Enter]
- [Enter]
- [Enter]
  [Enter]
  w [Enter]
 ```
-This is making a 500 MB boot partition, and giving the rest to the encrypted lvm2
+This is giving all space to the encrypted lvm2
 
 **5. Start the script:**
 
 ```
-chmod +x lmdescrypt
-sudo ./lmdescrypt
+source lmdescrypt
 ```
 
 **6. Answer the questions as they come up:**
