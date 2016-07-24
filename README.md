@@ -1,6 +1,6 @@
 
 # lmdescrypt
-### version 0.94
+### version 0.94a
 
 This script installs Linux Mint Debian Edition i686 or amd64, version 201403,
 or Linux Mint Debian Edition version 2 (201503),
@@ -12,8 +12,6 @@ The script doesn't work with UEFI-installs yet!
 Shortlink to download the script: http://j.mp/lmdescrypt
 
 Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
-
-See also forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
 
 Github page: https://github.com/pepa65/lmdescrypt
 

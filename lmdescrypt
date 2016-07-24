@@ -4,7 +4,7 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 
 ############################################################################
 #
-#  lmdescrypt 0.94
+#  lmdescrypt 0.94a
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -17,8 +17,6 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
 # Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
-#
-# See forum topic: http://forums.linuxmint.com/viewtopic.php?f=189&t=132520
 #
 # Github page: https://github.com/pepa65/lmdescrypt
 #
