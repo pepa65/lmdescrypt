@@ -56,27 +56,26 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 ##  [Enter]
 ##  w [Enter]
 ##
-## (This is giving all space to the encrypted lvm2)
+##  (This is giving all space to the encrypted lvm2)
 ##
 ### 5. Start the script:
 ##
 ##> source lmdescrypt
 ##
 ### 6. Answer the questions as they come up:
-## - password for encryption (three or four times, all the same one!)
-## Then after a wait for all the preparations to have happened:
-## - set password for user
-## - configure keyboard
-## - set timezone
+##  - password for encryption (three or four times, all the same one!)
+##  Then after a wait for all the preparations to have happened:
+##  - set password for user
+##  - configure keyboard
+##  - set timezone
 ##
 ### And that's it!
 ##
-##
 ### Installing into a pre-existing environment
-## Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
-## Not having a separate boot partition is also supported: total encryption!
-## Multiple booting with other OSes also works out of the box.
-## The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
+##  Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
+##  Not having a separate boot partition is also supported: total encryption!
+##  Multiple booting with other OSes also works out of the box.
+##  The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
 ##
 ############################################################################
 
