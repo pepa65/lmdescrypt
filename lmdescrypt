@@ -4,7 +4,7 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 
 ############################################################################
 #
-#  lmdescrypt 0.94a
+#  lmdescrypt 0.94b
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -102,7 +102,7 @@ force_random=0
 
 ## No need to adjust unless re-using existing volumes
 ## The crypt_label will also be used as the Volume Group name
-## If a Volume Group or Logical Volume with this name EXISTS, IT WILL BE USED!
+## If a Volume Group or Logical Volume with this name EXISTS, IT WILL BE USED!
 ## The data_label will also be the name of the mountpoint
 ## If empty, the default NAME (in NAME_label) will be used
 ### Filesystem labels (no spaces):
@@ -114,7 +114,7 @@ data_label=
 
 ## Don't allot more space than available, and at least 6GB for root
 ## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points or spaces, like: 10G or 200M
-## - if empty (only for swap or data) it will NOT BE USED
+## - if empty (only for swap or data) it will NOT BE USED
 ## - if EXISTING then the Logical Volume will not be created and needs to exist already
 ##   (and so should the Volume Group then!)
 ## - if REST (only for root or data, not both) then the rest of the available space will be used
@@ -231,7 +231,7 @@ else
 	if [[ $data_size ]]
 	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format data_size: '$data_size'" && return 17
+				&& Exit "Invalid format data_size: '$data_size'" && return 17
 		lvm_data="-L $data_size -Zy"
 	fi
 fi
@@ -306,7 +306,7 @@ fi
 ! [[ $root_size = REST ]] && ! [[ -h $root_dev ]] && lvcreate -L $root_size -Zy -n $root_label $crypt_label
 if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
-	if [[ -h $root_dev ]]
+	if [[ -h $data_dev ]]
 	then
 		data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
 		! [[ $data_fs ]] \
@@ -442,7 +442,7 @@ apt-get update
 rm -f /initrd.img
 apt-get --yes --reinstall install $packages
 X
-((lmde)) && echo "apt-get --yes purge '^live-.*'" && echo 'rm -rvf /lib/live'
+((lmde)) && echo "apt-get --yes purge '^live-.*'" && echo 'rm -rvf /lib/live'
 cat <<X
 update-grub
 grub-install --force --recheck "$grub_device"
