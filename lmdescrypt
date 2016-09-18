@@ -102,7 +102,7 @@ force_random=0
 
 ## No need to adjust unless re-using existing volumes
 ## The crypt_label will also be used as the Volume Group name
-## If a Volume Group or Logical Volume with this name EXISTS, IT WILL BE USED!
+## If a Volume Group or Logical Volume with this name EXISTS, IT WILL BE USED!
 ## The data_label will also be the name of the mountpoint
 ## If empty, the default NAME (in NAME_label) will be used
 ### Filesystem labels (no spaces):
@@ -203,17 +203,17 @@ self=$(basename $BASH_SOURCE)
 ## If not run interactively, don't run
 [[ $- != *i* ]] && Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING" && exit 1
 ((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 2
-[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 3
+[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 3
 
 ## Check existence of mandatory devices
 ! [[ -w "$crypt_part" ]] && Exit "Crypt device does not exist or is not writable: '$crypt_part'" && return 4
-! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 5
+! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 5
 
 ## Check names, labels, root_fs
-! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 6
+! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 6
 ! [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] && Exit "Illegal format for hostname: '$hostname'" && return 7
 Checklabel crypt && return 8
-[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 9
+[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 9
 Checklabel boot && return 10
 Checklabel root && return 11
 Checklabel swap && return 12
