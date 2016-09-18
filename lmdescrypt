@@ -164,7 +164,7 @@ Echo(){ ## $1=message
 	echo -e '_______________________________________________________________________________\n'
 }
 
-## Needs to be followed by 'return' in the main body!
+## To really exit it Needs to be followed by 'return' in the main body!
 Exit(){ ## $1=message
 	Echo "  ERROR: $1\n  ABORTING";
 }
@@ -201,12 +201,7 @@ Checklabel(){ ## $1: labelname
 self=$(basename $BASH_SOURCE)
 
 ## If not run interactively, don't run
-if [[ $- != *i* ]]
-then
-	Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING"
-else
-##[ Rest of the script
-
+[[ $- != *i* ]] Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING" && exit 1
 ((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 2
 [[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 3
 
@@ -482,8 +477,5 @@ cryptsetup luksClose $crypt_label
 sync
 
 Echo "Ready for reboot!"
-
-##] End of the rest of the script
-fi
 
 return 0
