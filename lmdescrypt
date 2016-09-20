@@ -4,7 +4,7 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 
 ############################################################################
 #
-#  lmdescrypt 0.94c
+#  lmdescrypt 0.95
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -150,7 +150,7 @@ cryptopts='-c aes-xts-plain -s 512 -h sha512'
 username=me
 hostname=mine
 
-## Adjust according to preference
+## Adjust according to preference; internet connection required!
 ### Extra packages to be installed (in between the single quotes, seperated by space):
 packages=''
 
@@ -250,8 +250,6 @@ else
 		lvm_swap="-L $swap_size -Cy -Zy"
 	fi
 fi
-
-packages+=" linux-image-$(uname -r)"
 
 rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
 rofslm='/rofs'
@@ -401,59 +399,59 @@ echo "$LANG UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
+cp /cdrom/casper/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
 mount --bind /dev "$target/dev"
 
 ## Prepare the chroot script
 inside="/root/$self.inside"
-(cat <<\X
+(cat <<X
 #!/bin/bash
-export PS1="\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]"
+set +o verbose -o errtrace
+export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
 lvmetad -p /pid
 mount -t sysfs sys /sys
 mount -t proc proc /proc
 mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
-X
-echo "useradd -ms /bin/bash $username"
-cat <<\X
+useradd -ms /bin/bash $username
 pw="" pwa="" pw_set=0
 while ! ((pw_set))
 do
-	pw=$(/lib/cryptsetup/askpass "Enter user password: ")
-	if [[ "$pw" ]]
+	pw=\$(/lib/cryptsetup/askpass "Enter user password: ")
+	if [[ "\$pw" ]]
 	then
-		pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
+		pwa=\$(/lib/cryptsetup/askpass "Enter the same password again: ")
 		echo
-			[[ "$pw" = "$pwa" ]] && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+			[[ "\$pw" = "\$pwa" ]] && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
 	else
 		echo "Empty password not allowed!"
 	fi
 done
+chpasswd <<<"$username:\$pw"
+addgroup $username sudo
 X
-echo "chpasswd <<<\"$username:\$pw\""
-((lmde)) && echo 'chpasswd <<<"root:$pw"'
-echo "addgroup $username sudo"
-((lmde)) || echo 'passwd -l root'
+((lmde)) && echo 'chpasswd <<<"root:$pw"' || echo 'passwd -l root'
 cat <<X
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration
 dpkg --configure -a
-apt-get update
-rm -f /initrd.img
-apt-get --yes --reinstall install $packages
+if [[ -n "$packages" ]]
+then
+	apt-get update
+	apt-get --yes --reinstall install $packages
+fi
 X
 ((lmde)) && echo "apt-get --yes purge '^live-.*'" && echo 'rm -rvf /lib/live'
 cat <<X
 update-grub
 grub-install --force --recheck "$grub_device"
-X
-cat <<\X
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
 umount /sys
-kill -9 $(cat /pid)
+kill -9 \$(cat /pid)
+rm /pid
 exit 0
 X
 ) >"$target$inside"
