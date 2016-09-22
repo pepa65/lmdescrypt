@@ -401,6 +401,7 @@ p3=none p4=luks
 if ! [[ $boot_part ]]
 then
 	if ((insecure_keyfile))
+	then
 		keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
 		mv "$key" "$target/$key"
 		chmod 000 "$target/$key"
