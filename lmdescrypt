@@ -264,12 +264,12 @@ pwfile=/root/pw
 pw_set=0
 while ! ((pw_set))
 do
-	pw=\$(/lib/cryptsetup/askpass "Enter encryption password: ")
-	if [[ "\$pw" ]]
+	pw=$(/lib/cryptsetup/askpass "Enter encryption password: ")
+	if [[ "$pw" ]]
 	then
-		pwa=\$(/lib/cryptsetup/askpass "Enter the same password again: ")
+		pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
 	echo
-		[[ "\$pw" = "\$pwa" ]] && unset pwa && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+		[[ "$pw" = "$pwa" ]] && unset pwa && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
 	else
 		echo "Empty password not allowed!"
 	fi
