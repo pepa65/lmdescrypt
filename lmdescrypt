@@ -397,22 +397,23 @@ echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
 echo "$root_dev / $root_fs relatime,errors=remount-ro 0 1" >>"$target/etc/fstab"
 [[ $swap_size ]] && echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
 [[ $data_size ]] && echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
-if ! [[ $boot_part ]] && ((insecure_keyfile))
+p3=none p4=luks
+if ! [[ $boot_part ]]
 then
-	keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
-	mv "$key" "$target/$key"
-	chmod 000 "$target/$key"
-	echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
-	chmod +x "$keytarget"
+	if ((insecure_keyfile))
+		keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
+		mv "$key" "$target/$key"
+		chmod 000 "$target/$key"
+		echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
+		chmod +x "$keytarget"
+		p3="/$key"
+		p4="luks,keyscript=/bin/cat"
+	fi
 	sed -i '/^GRUB_TIMEOUT/a GRUB_ENABLE_CRYPTODISK=y' "$target/etc/default/grub"
 	gcl="GRUB_CMDLINE_LINUX=\"cryptdevice=$crypt_part:$crypt_label\""
 	sed -i "s@^GRUB_CMDLINE_LINUX=\"\"@$gcl@" "$target/etc/default/grub"
-	p3="/$key"
-	p4="luks,keyscript=/bin/cat"
 else
 	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
-	p3=none
-	p4=luks
 fi
 sed -i 's/^GRUB_TIMEOUT=10/GRUB_TIMEOUT=4/' "$target/etc/default/grub"
 sed -i 's/^GRUB_HIDDEN_TIMEOUT=0/#GRUB_HIDDEN_TIMEOUT=0/' "$target/etc/default/grub"
