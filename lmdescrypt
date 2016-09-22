@@ -432,6 +432,7 @@ cp /etc/resolv.conf "$target/etc"
 cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
 ((lmde)) && cp /lib/live/mount/medium/live/vmlinuz "$target/boot/vmlinuz-$(uname -r)" \
 		|| cp /cdrom/casper/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
+((lmde)) && update-initramfs -c
 mount --bind /dev "$target/dev"
 
 ## Prepare the chroot script
