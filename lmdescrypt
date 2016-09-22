@@ -259,6 +259,8 @@ else
 	fi
 fi
 
+Echo "lmdescrypt 0.96\nInstall Linux Mint with LUKS encryption"
+
 ## Encrypt
 pwfile=/root/pw
 pw_set=0
@@ -290,7 +292,7 @@ if ! [[ $boot_part ]] && ((insecure_keyfile))
 then
 	key=/root/crypto_keyfile.bin
 	dd bs=512 count=4 if=/dev/urandom of="$key"
-	cryptsetup luksAddKey "$crypt_part" "$key"
+	cryptsetup luksAddKey "$crypt_part" "$key" --key-file "$pwfile"
 fi
 
 ## Decrypt if not yet mapped
