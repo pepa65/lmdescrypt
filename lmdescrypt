@@ -430,10 +430,8 @@ echo "$LANG UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
 cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
-v=$(uname -r)
-((lmde)) && cp /lib/live/mount/medium/live/vmlinuz "$target/boot/vmlinuz-$v" \
-		&& update-initramfs -c -k $v \
-		|| cp /cdrom/casper/vmlinuz "$target/boot/vmlinuz-$v"
+((lmde)) && cp /lib/live/mount/medium/live/vmlinuz "$target/boot/vmlinuz-$(uname -r)" \
+		|| cp /cdrom/casper/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
 mount --bind /dev "$target/dev"
 
 ## Prepare the chroot script
@@ -477,8 +475,11 @@ then
 	apt-get --yes --reinstall install $packages
 fi
 X
-((lmde)) && echo "apt-get --yes purge '^live-.*'" && echo 'rm -rvf /lib/live'
+((lmde)) && echo "apt-get --yes purge '^live-.*'" \
+		&& echo 'rm -rvf /lib/live' \
+		&& echo "update-initramfs -c -k $(uname -r)"
 cat <<X
+chmod 600 "/boot/initrd.img-$(uname -r)"
 update-grub
 grub-install --force --recheck "$grub_device"
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
