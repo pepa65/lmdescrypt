@@ -410,7 +410,7 @@ then
 		chmod 000 "$target/$key"
 		echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
 		chmod +x "$keytarget"
-		p3="/$key"
+		((lmde)) && p3="/crypto_keyfile.bin" || p3="$key"
 		p4="luks,keyscript=/bin/cat"
 	fi
 	sed -i '/^GRUB_TIMEOUT/a GRUB_ENABLE_CRYPTODISK=y' "$target/etc/default/grub"
