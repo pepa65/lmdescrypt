@@ -413,6 +413,7 @@ then
 	sed -i '/^GRUB_TIMEOUT/a GRUB_ENABLE_CRYPTODISK=y' "$target/etc/default/grub"
 	gcl="GRUB_CMDLINE_LINUX=\"cryptdevice=$crypt_part:$crypt_label\""
 	sed -i "s@^GRUB_CMDLINE_LINUX=\"\"@$gcl@" "$target/etc/default/grub"
+	sed -i "s@ splash\"$@@" "$target/etc/default/grub"
 else
 	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
 fi
