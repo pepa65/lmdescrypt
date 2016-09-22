@@ -1,6 +1,7 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
-trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
+trap 'set +o xtrace +o verbose +o errexit +o errtrace; return' 8 9
+version=0.96
 
 ############################################################################
 #
@@ -259,7 +260,7 @@ else
 	fi
 fi
 
-Echo "lmdescrypt 0.96\nInstall Linux Mint with LUKS encryption"
+Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
 ## Encrypt
 pwfile=/root/pw
@@ -302,8 +303,8 @@ rm -- "$pwfile"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
 ## Make lvm2 volumes if not there yet and format if wanted
+vgchange -ay
 [[ "  $crypt_label" = "$(vgs --noheadings -o vg_name)" ]] || vgcreate -Zy $crypt_label $crypt_dev
-vgchange --refresh
 root_dev="/dev/$crypt_label/$root_label"
 data_dev="/dev/$crypt_label/$data_label"
 swap_dev="/dev/$crypt_label/$swap_label"
