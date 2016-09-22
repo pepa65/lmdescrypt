@@ -291,9 +291,9 @@ fi
 
 if ! [[ $boot_part ]] && ((insecure_keyfile))
 then
-	key=/root/crypto_keyfile.bin
-	dd bs=512 count=4 if=/dev/urandom of="$key"
-	cryptsetup luksAddKey "$crypt_part" "$key" --key-file "$pwfile"
+	key=crypto_keyfile.bin
+	dd bs=512 count=4 if=/dev/urandom of="/root/$key"
+	cryptsetup luksAddKey "$crypt_part" "/root/$key" --key-file "$pwfile"
 fi
 
 ## Decrypt if not yet mapped
@@ -406,11 +406,11 @@ then
 	if ((insecure_keyfile))
 	then
 		keytarget="$target/etc/initramfs-tools/hooks/crypto_keyfile"
-		mv "$key" "$target/$key"
-		chmod 000 "$target/$key"
-		echo "cp /$key \"\${DESTDIR}\"" >"$keytarget"
+		mv "/root/$key" "$target/root/$key"
+		chmod 000 "$target/root/$key"
+		echo "cp /root/$key \"\${DESTDIR}\"" >"$keytarget"
 		chmod +x "$keytarget"
-		((lmde)) && p3="/crypto_keyfile.bin" || p3="$key"
+		p3="/$key"
 		p4="luks,keyscript=/bin/cat"
 	fi
 	sed -i '/^GRUB_TIMEOUT/a GRUB_ENABLE_CRYPTODISK=y' "$target/etc/default/grub"
