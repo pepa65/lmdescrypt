@@ -4,7 +4,7 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 
 ############################################################################
 #
-#  lmdescrypt 0.95
+#  lmdescrypt 0.96
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -63,7 +63,7 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 ##> source lmdescrypt
 ##
 ### 6. Answer the questions as they come up:
-##  - password for encryption (three or four times, all the same one!)
+##  - password for encryption
 ##  Then after a wait for all the preparations to have happened:
 ##  - set password for user
 ##  - configure keyboard
@@ -90,6 +90,14 @@ trap 'set +o xtrace +o verbose +o errexit +o errtrace' 8 9
 ### Partitions to use (total encryption: boot_part should be empty)
 boot_part=
 crypt_part=/dev/sda1
+
+## When booting with total encryption, it is necessary to enter the password
+##  twice, once for grub and once for the kernel to decrypt the LUKS partition
+## Entering a password only once to unlock is possible by using a keyfile that
+##  is stored in the initrd file, but anyone can access it and then use it to
+##  decrypt the LUKS-encrypted partition!
+### Set to 1 to use an initrd keyfile --INSECURE!-- when doing total encryption
+insecure_keyfile=0
 
 ## Adjust only if you already have a LUKS encrypted partition that you want to wipe and start from scratch
 ### Wipe the crypt-partition before setup, even if already set up, if 1:
@@ -251,37 +259,44 @@ else
 	fi
 fi
 
-rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
-rofslm='/rofs'
-if [[ -d /lib/live ]]
-then  ## Debian Edition
-	lmde=1
-	rofs=$rofsde
-else  ## regular Mint
-	lmde=0
-	rofs=$rofslm
-fi
-
 ## Encrypt
-Echo "Enter encryption password (a number of times)"
+pwfile=/root/pw
+pw_set=0
+while ! ((pw_set))
+do
+	pw=\$(/lib/cryptsetup/askpass "Enter encryption password: ")
+	if [[ "\$pw" ]]
+	then
+		pwa=\$(/lib/cryptsetup/askpass "Enter the same password again: ")
+	echo
+		[[ "\$pw" = "\$pwa" ]] && unset pwa && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+	else
+		echo "Empty password not allowed!"
+	fi
+done
+echo -n "$pw" >>"$pwfile"
+unset pw
+
 if ((force_reencrypt))
 then
 	((force_random)) && badblocks -c 10240 -s -w -t random -v "$crypt_part"
-	cryptsetup luksFormat $cryptopts "$crypt_part"
+	cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwfile"
 else
 	cryptsetup isLuks "$crypt_part" && echo -e "\n  $crypt_part is already formatted, reencryption not forced" \
-			|| cryptsetup luksFormat $cryptopts "$crypt_part"
+			|| cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwfile"
 fi
-if ! [[ $boot_part ]]
+
+if ! [[ $boot_part ]] && ((insecure_keyfile))
 then
-	key=crypto_keyfile.bin
+	key=/root/crypto_keyfile.bin
 	dd bs=512 count=4 if=/dev/urandom of="$key"
 	cryptsetup luksAddKey "$crypt_part" "$key"
 fi
 
 ## Decrypt if not yet mapped
 crypt_dev="/dev/mapper/$crypt_label"
-[[ -b "$crypt_dev" ]] || cryptsetup luksOpen "$crypt_part" $crypt_label
+[[ -b "$crypt_dev" ]] || cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwfile"
+rm -- "$pwfile"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
 ## Make lvm2 volumes if not there yet and format if wanted
@@ -364,6 +379,16 @@ then
 fi
 
 ## Copy
+rofsde='/lib/live/mount/rootfs/filesystem.squashfs'
+rofslm='/rofs'
+if [[ -d /lib/live ]]
+then  ## Debian Edition
+	lmde=1
+	rofs=$rofsde
+else  ## regular Mint
+	lmde=0
+	rofs=$rofslm
+fi
 Echo "Copying takes a while..."
 cp -a "$rofs"/* "$target"
 
@@ -415,7 +440,7 @@ mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
 useradd -ms /bin/bash $username
-pw="" pwa="" pw_set=0
+pw_set=0
 while ! ((pw_set))
 do
 	pw=\$(/lib/cryptsetup/askpass "Enter user password: ")
@@ -423,7 +448,7 @@ do
 	then
 		pwa=\$(/lib/cryptsetup/askpass "Enter the same password again: ")
 		echo
-			[[ "\$pw" = "\$pwa" ]] && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+			[[ "\$pw" = "\$pwa" ]] && unset pwa && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
 	else
 		echo "Empty password not allowed!"
 	fi
@@ -432,6 +457,7 @@ chpasswd <<<"$username:\$pw"
 addgroup $username sudo
 X
 ((lmde)) && echo 'chpasswd <<<"root:$pw"' || echo 'passwd -l root'
+unset pw
 cat <<X
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration
