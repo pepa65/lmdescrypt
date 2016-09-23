@@ -263,7 +263,6 @@ fi
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
 ## Encrypt
-pwfile=/root/pw
 pw_set=0
 while ! ((pw_set))
 do
@@ -277,29 +276,27 @@ do
 		echo "Empty password not allowed!"
 	fi
 done
-echo -n "$pw" >>"$pwfile"
-unset pw
 
 if ((force_reencrypt))
 then
 	((force_random)) && badblocks -c 10240 -s -w -t random -v "$crypt_part"
-	cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwfile"
+	echo -n "$pw" |cryptsetup luksFormat $cryptopts "$crypt_part" --key-file -
 else
 	cryptsetup isLuks "$crypt_part" && echo -e "\n  $crypt_part is already formatted, reencryption not forced" \
-			|| cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwfile"
+			|| echo -n "$pw" |cryptsetup luksFormat $cryptopts "$crypt_part" --key-file -
 fi
 
 if ! [[ $boot_part ]] && ((insecure_keyfile))
 then
 	key=crypto_keyfile.bin
 	dd bs=512 count=4 if=/dev/urandom of="/root/$key"
-	cryptsetup luksAddKey "$crypt_part" "/root/$key" --key-file "$pwfile"
+	echo -n "$pw" |cryptsetup luksAddKey "$crypt_part" "/root/$key" --key-file -
 fi
 
 ## Decrypt if not yet mapped
 crypt_dev="/dev/mapper/$crypt_label"
-[[ -b "$crypt_dev" ]] || cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwfile"
-rm -- "$pwfile"
+[[ -b "$crypt_dev" ]] || echo -n "$pw" |cryptsetup luksOpen "$crypt_part" $crypt_label --key-file -
+unset pw
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
 ## Make lvm2 volumes if not there yet and format if wanted
