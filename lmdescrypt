@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
-trap 'set +o xtrace +o verbose +o errexit +o errtrace; return' 8 9
-version=0.96
+trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' 8 9
+version=0.96a
 
 ############################################################################
 #
-#  lmdescrypt 0.96
+#  lmdescrypt 0.96a
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -151,8 +151,9 @@ grub_device=/dev/sda
 
 ## Adjust if you require another encryption scheme
 ## Find the speeds on your hardware by: cryptsetup benchmark (and choose accordingly)
+## The -i parameter is the number of milliseconds spend iterating on THIS system
 ### Parameters for cryptsetup luksFormat:
-cryptopts='-c aes-xts-plain -s 512 -h sha512'
+cryptopts='-c aes-xts-plain64 -s 512 -h sha512 -i 3000'
 
 ## Adjust according to preference
 ### Username and hostname (no spaces):
@@ -180,7 +181,7 @@ Exit(){ ## $1=message
 
 Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 	case $1 in
-		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) ! [[ $4 = data ]] && return 1 ;;&
+		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) ! [[ $4 = data ]] && return 2 ;;&
 		## Continue even if the above pattern matched (unless $4 isn't data)
 		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
 		hfs) mkfs.$1 -h -v "$2" "$3" ;;
@@ -191,7 +192,7 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 		ntfs) mkfs.$1 -f -F -U -L "$2" "$3" ;;
 		reiserfs) mkfs.$1 -ffl "$2" "$3" ;;
 		xfs) mkfs.$1 -f -L "$2" "$3" ;;
-		*) return 2 ;;
+		*) return 3 ;;
 	esac
 }
 
@@ -211,38 +212,38 @@ self=$(basename $BASH_SOURCE)
 
 ## If not run interactively, don't run
 [[ $- != *i* ]] && Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING" && exit 1
-((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 2
-[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 3
+((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 4
+[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 5
 
 ## Check existence of mandatory devices
-! [[ -w "$crypt_part" ]] && Exit "Crypt device does not exist or is not writable: '$crypt_part'" && return 4
-! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 5
+! [[ -w "$crypt_part" ]] && Exit "Crypt device does not exist or is not writable: '$crypt_part'" && return 6
+! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 7
 
 ## Check names, labels, root_fs
-! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 6
-! [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] && Exit "Illegal format for hostname: '$hostname'" && return 7
-Checklabel crypt && return 8
-[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 9
-Checklabel boot && return 10
-Checklabel root && return 11
-Checklabel swap && return 12
-Checklabel data && return 13
+! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 8
+! [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] && Exit "Illegal format for hostname: '$hostname'" && return 9
+Checklabel crypt && return 10
+[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 11
+Checklabel boot && return 12
+Checklabel root && return 13
+Checklabel swap && return 14
+Checklabel data && return 15
 ! [[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-		&& Exit "Wrong value for root_fs: '$root_fs'" && return 14
+		&& Exit "Wrong value for root_fs: '$root_fs'" && return 16
 
 ## Determine root and data partition usage & size
 [[ $root_size ]] && ! [[ $root_size = REST ]] && ! [[ $root_size = EXISTING ]] \
 		&& ! [[ $root_size =~ [1-9][0-9]*[MG] ]] \
-		&& Exit "Invalid format root_size: '$root_size'" && return 15
+		&& Exit "Invalid format root_size: '$root_size'" && return 17
 if [[ $data_size = REST ]]
 then
-	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST" && return 16
+	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST" && return 18
 	lvm_data='-l 100%FREE -Zy'
 else
 	if [[ $data_size ]]
 	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format data_size: '$data_size'" && return 17
+				&& Exit "Invalid format data_size: '$data_size'" && return 19
 		lvm_data="-L $data_size -Zy"
 	fi
 fi
@@ -255,7 +256,7 @@ else
 	if ! [[ $swap_size = EXISTING ]]
 	then
 		[[ $swap_size ]] && ! [[ $swap_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format swap_size: $swap_size" && return 18
+				&& Exit "Invalid format swap_size: $swap_size" && return 20
 		lvm_swap="-L $swap_size -Cy -Zy"
 	fi
 fi
@@ -263,15 +264,17 @@ fi
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
 ## Encrypt
+pwf="/dev/shm/pw$RANDOM"
+chmod 600 "$pwf"
 pw_set=0
 while ! ((pw_set))
 do
-	pw=$(/lib/cryptsetup/askpass "Enter encryption password: ")
-	if [[ "$pw" ]]
+	/lib/cryptsetup/askpass "Enter encryption password: " >"$pwf"
+	if [[ -s "$pwf" ]]
 	then
-		pwa=$(/lib/cryptsetup/askpass "Enter the same password again: ")
-	echo
-		[[ "$pw" = "$pwa" ]] && unset pwa && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+		grep -q "^$(/lib/cryptsetup/askpass "Enter the same password again: ")$" "$pwf" \
+				&& echo && pw_set=1 \
+				|| echo -e "\nPasswords not the same, do it again!\n"
 	else
 		echo "Empty password not allowed!"
 	fi
@@ -280,23 +283,24 @@ done
 if ((force_reencrypt))
 then
 	((force_random)) && badblocks -c 10240 -s -w -t random -v "$crypt_part"
-	echo -n "$pw" |cryptsetup luksFormat $cryptopts "$crypt_part" --key-file -
+	cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwf"
 else
 	cryptsetup isLuks "$crypt_part" && echo -e "\n  $crypt_part is already formatted, reencryption not forced" \
-			|| echo -n "$pw" |cryptsetup luksFormat $cryptopts "$crypt_part" --key-file -
+			|| cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwf"
 fi
 
 if ! [[ $boot_part ]] && ((insecure_keyfile))
 then
 	key=crypto_keyfile.bin
 	dd bs=512 count=4 if=/dev/urandom of="/root/$key"
-	echo -n "$pw" |cryptsetup luksAddKey "$crypt_part" "/root/$key" --key-file -
+	cryptsetup luksAddKey "$crypt_part" "/root/$key" --key-file "$pwf"
 fi
 
 ## Decrypt if not yet mapped
 crypt_dev="/dev/mapper/$crypt_label"
-[[ -b "$crypt_dev" ]] || echo -n "$pw" |cryptsetup luksOpen "$crypt_part" $crypt_label --key-file -
-unset pw
+[[ ! -b "$crypt_dev" ]] && ! cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" \
+		&& Exit "Failed to open the encrypted partition $crypt_part" && return 21
+rm -- "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
 ## Make lvm2 volumes if not there yet and format if wanted
@@ -312,7 +316,7 @@ then
 	! [[ -h $swap_dev ]] && lvcreate $lvm_swap -n $swap_label $crypt_label
 	if [[ $swap_fs ]]
 	then
-		! [[ $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" && return 19 \
+		! [[ $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" && return 22 \
 				|| mkswap -f -L $swap_label "$swap_dev"
 	fi
 fi
@@ -325,39 +329,39 @@ then  ## Create if it doesn't exist and format if required
 	then
 		data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
 		! [[ $data_fs ]] \
-				&& Exit "Data volume is not formatted; format first or fill in 'data_fs'" && return 20
+				&& Exit "Data volume is not formatted; format first or fill in 'data_fs'" && return 23
 	else
-		! [[ $data_fs ]] && Exit "Can't create data partition without format" && return 21
+		! [[ $data_fs ]] && Exit "Can't create data partition without format" && return 24
 		lvcreate $lvm_data -n $data_label $crypt_label
 		! Mkfs "$data_fs" "$data_label" "$data_dev" data \
-				&& Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" && return 22
+				&& Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" && return 25
 	fi
 fi
 [[ $root_size = REST ]] && ! [[ -h $root_dev ]] && lvcreate -l 100%FREE -Zy -n $root_label $crypt_label
 if [[ $root_fs ]]
 then
 	! Mkfs "$root_fs" "$root_label" "$root_dev" root \
-			&& Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" && return 23
+			&& Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" && return 26
 else
 	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
 	! [[ $root_fs ]] \
-			&& Exit "Root volume is not formatted; format first or fill in 'root_fs'" && return 24
+			&& Exit "Root volume is not formatted; format first or fill in 'root_fs'" && return 27
 	[[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs)$ ]] \
-			&& Exit "Root partition has unsupported filesystem: $root_fs" && return 25
+			&& Exit "Root partition has unsupported filesystem: $root_fs" && return 28
 fi
 
 if [[ $boot_part ]]
 then
 	! [[ $boot_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-			&& Exit "Wrong value for boot_fs: '$boot_fs'" && return 26
+			&& Exit "Wrong value for boot_fs: '$boot_fs'" && return 29
 	if [[ $boot_fs ]]
 	then
 		! Mkfs "$boot_fs" "$boot_label" "$boot_part" boot \
-				&& Exit "Unsupported filesystem $boot_fs for boot-device $boot_dev with label $boot_label" && return 27
+				&& Exit "Unsupported filesystem $boot_fs for boot-device $boot_dev with label $boot_label" && return 30
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		! [[ $boot_fs ]] \
-				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty" && return 28
+				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty" && return 31
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
@@ -426,6 +430,8 @@ echo $hostname >"$target/etc/hostname"
 echo "$LANG UTF-8" >>"$target/etc/locale.gen"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
+cryptsetup luksHeaderBackup --header-backup-file "$target/root/$crypt_label.luksHeaderBackup" "$crypt_part"
+chmod 400 "$target/root/$crypt_label.luksHeaderBackup"
 cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
 ((lmde)) && cp /lib/live/mount/medium/live/vmlinuz "$target/boot/vmlinuz-$(uname -r)" \
 		|| cp /cdrom/casper/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
@@ -444,25 +450,27 @@ mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
 useradd -ms /bin/bash $username
+pwf="/dev/shm/pw\$RANDOM"
+chmod 600 "\$pwf"
 pw_set=0
 while ! ((pw_set))
 do
-	pw=\$(/lib/cryptsetup/askpass "Enter user password: ")
-	if [[ "\$pw" ]]
+	/lib/cryptsetup/askpass "Enter user password: " >"\$pwf"
+	if [[ -s "\$pwf" ]]
 	then
-		pwa=\$(/lib/cryptsetup/askpass "Enter the same password again: ")
-		echo
-			[[ "\$pw" = "\$pwa" ]] && unset pwa && pw_set=1 || echo -e "Passwords not the same, do it again!\n"
+		grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \
+				&& echo && pw_set=1 \
+				|| echo -e "\nPasswords not the same, do it again!\n"
 	else
 		echo "Empty password not allowed!"
 	fi
 done
-chpasswd <<<"$username:\$pw"
+chpasswd <<<"$username:\$(cat "\$pwf")"
 addgroup $username sudo
 X
-((lmde)) && echo 'chpasswd <<<"root:$pw"' || echo 'passwd -l root'
-unset pw
+((lmde)) && echo 'chpasswd <<<"root:$(cat "$pwf")"' || echo 'passwd -l root'
 cat <<X
+rm "\$pwf"
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration
 dpkg --configure -a
