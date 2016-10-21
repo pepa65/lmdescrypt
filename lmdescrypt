@@ -273,9 +273,9 @@ do
 	if [[ -s "$pwf" ]]
 	then
 		! grep -q "^$(/lib/cryptsetup/askpass "Enter the same password again: ")$" "$pwf" \
-				&& >"$pwf" && echo -e "\nPasswords not the same, do it again!\n"
+				&& >"$pwf" && echo -e "Passwords not the same, do it again!\n"
 	else
-		echo "Empty password not allowed!"
+		echo -e "Empty password not allowed!\n"
 	fi
 done
 
@@ -470,8 +470,8 @@ X
 cat <<X
 rm "\$pwf"
 dpkg-reconfigure tzdata
+setupcon
 dpkg-reconfigure keyboard-configuration
-#dpkg --configure -a
 if [[ -n "$packages" ]]
 then
 	apt-get update
