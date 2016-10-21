@@ -1,6 +1,6 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
-trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' 8 9
+trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
 version=0.96a
 
 ############################################################################
@@ -149,7 +149,7 @@ data_fs=
 ### Device to install grub (by any valid device path):
 grub_device=/dev/sda
 
-## Adjust if you require another encryption scheme
+## Adjust if you require another encryption scheme, see /proc/crypto
 ## Find the speeds on your hardware by: cryptsetup benchmark (and choose accordingly)
 ## The -i parameter is the number of milliseconds spend iterating on THIS system
 ### Parameters for cryptsetup luksFormat:
@@ -470,7 +470,6 @@ X
 cat <<X
 rm "\$pwf"
 dpkg-reconfigure tzdata
-setupcon
 dpkg-reconfigure keyboard-configuration
 if [[ -n "$packages" ]]
 then
