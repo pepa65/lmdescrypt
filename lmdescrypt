@@ -265,16 +265,15 @@ Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
 ## Encrypt
 pwf="/dev/shm/pw$RANDOM"
+>"$pwf"
 chmod 600 "$pwf"
-pw_set=0
-while ! ((pw_set))
+while [[ ! -s "$pwf" ]]
 do
 	/lib/cryptsetup/askpass "Enter encryption password: " >"$pwf"
 	if [[ -s "$pwf" ]]
 	then
-		grep -q "^$(/lib/cryptsetup/askpass "Enter the same password again: ")$" "$pwf" \
-				&& echo && pw_set=1 \
-				|| echo -e "\nPasswords not the same, do it again!\n"
+		! grep -q "^$(/lib/cryptsetup/askpass "Enter the same password again: ")$" "$pwf" \
+				&& >"$pwf" && echo -e "\nPasswords not the same, do it again!\n"
 	else
 		echo "Empty password not allowed!"
 	fi
@@ -451,18 +450,17 @@ pvscan --cache
 locale-gen --purge --no-archive
 useradd -ms /bin/bash $username
 pwf="/dev/shm/pw\$RANDOM"
+>"\$pwf"
 chmod 600 "\$pwf"
-pw_set=0
-while ! ((pw_set))
+while [[ ! -s "\$pwf" ]]
 do
 	/lib/cryptsetup/askpass "Enter user password: " >"\$pwf"
 	if [[ -s "\$pwf" ]]
 	then
-		grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \
-				&& echo && pw_set=1 \
-				|| echo -e "\nPasswords not the same, do it again!\n"
+		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \
+				&& >"\$pwf" && echo -e "Passwords not the same, do it again!\n"
 	else
-		echo "Empty password not allowed!"
+		echo -e "Empty password not allowed!\n"
 	fi
 done
 chpasswd <<<"$username:\$(cat "\$pwf")"
@@ -473,7 +471,7 @@ cat <<X
 rm "\$pwf"
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration
-dpkg --configure -a
+#dpkg --configure -a
 if [[ -n "$packages" ]]
 then
 	apt-get update
