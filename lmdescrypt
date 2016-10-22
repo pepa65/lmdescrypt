@@ -457,7 +457,7 @@ do
 	/lib/cryptsetup/askpass "Enter user password: " >"\$pwf"
 	if [[ -s "\$pwf" ]]
 	then
-		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \
+		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \\
 				&& >"\$pwf" && echo -e "Passwords not the same, do it again!\n"
 	else
 		echo -e "Empty password not allowed!\n"
