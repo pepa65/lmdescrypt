@@ -1,11 +1,11 @@
 
 # lmdescrypt
-### version 0.96a
+### version 0.97
 
 This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503),
 or regular Linux Mint 17.1, 17.2, 17.3 or 18, either i686 or amd64, to be:<br>
 *Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data).*<br>
-The script doesn't work with UEFI-installs yet!
+UEFI installs only work for Mint 18 (64-bit)<br>
 
 Shortlink to download the script: http://j.mp/lmdescrypt
 
@@ -63,8 +63,8 @@ source lmdescrypt
 
 Then after a wait for all the preparations to have happened, and supply:
 * set password for user
-* configure keyboard
 * set timezone
+* configure keyboard
 
 ## And that's it!
 
@@ -75,5 +75,4 @@ Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is e
 Not having a separate boot partition is also supported: total encryption!
 
 Multiple booting with other OSes also works out of the box.
-
-The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
+MBR, GPT partition tables and UEFI works according to configuration.

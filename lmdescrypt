@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.96a
+version=0.97
 
 ############################################################################
 #
-#  lmdescrypt 0.96a
+#  lmdescrypt 0.97
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -13,7 +13,7 @@ version=0.96a
 #  or Linux Mint Debian Edition version 2 (201503),
 #  or regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:
 #  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
-# The script doesn't work with UEFI-installs yet!
+#  UEFI installs only work for Mint 18 (64-bit)
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -67,8 +67,8 @@ version=0.96a
 ##  - password for encryption
 ##  Then after a wait for all the preparations to have happened:
 ##  - set password for user
-##  - configure keyboard
 ##  - set timezone
+##  - configure keyboard
 ##
 ### And that's it!
 ##
@@ -76,7 +76,7 @@ version=0.96a
 ##  Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
 ##  Not having a separate boot partition is also supported: total encryption!
 ##  Multiple booting with other OSes also works out of the box.
-##  The options are to USE (or not), to CREATE (or not), and to FORMAT (or not) these devices.
+##  MBR, GPT partition tables and UEFI works according to configuration.
 ##
 ############################################################################
 
@@ -85,10 +85,16 @@ version=0.96a
 ############################################################################
 ### Review all settings in this section
 
+### The device to be booted (for the grub bootloader: usually a drive!):
+grub_device=/dev/sda
+
 ## Adjust if needed (not needed if following the suggested partitioning)
 ## Specify the partitions you created by any valid device path, like:
 ## /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
-### Partitions to use (total encryption: boot_part should be empty)
+## Total encryption: boot_part should be empty
+## UEFI setup: a efi partition (type ef00) of at least 200M should be there
+## GPT (no UEFI) setup: a bios partition (type ef02) of at least 2M should be there
+### Partitions to use:
 boot_part=
 crypt_part=/dev/sda1
 
@@ -97,7 +103,7 @@ crypt_part=/dev/sda1
 ## Entering a password only once to unlock is possible by using a keyfile that
 ##  is stored in the initrd file, but anyone can access it and then use it to
 ##  decrypt the LUKS-encrypted partition!
-### Set to 1 to use an initrd keyfile --INSECURE!-- when doing total encryption
+### Set to 1 to use an initrd keyfile --INSECURE!-- when doing total encryption:
 insecure_keyfile=0
 
 ## Adjust only if you already have a LUKS encrypted partition that you want to wipe and start from scratch
@@ -129,7 +135,7 @@ data_label=
 ## - if REST (only for root or data, not both) then the rest of the available space will be used
 ## - DEFAULT (only for swap) means 40% of RAM size (/sys/power/image_size)
 ##   (See: https://www.kernel.org/doc/Documentation/power/interface.txt)
-### Partition usage & sizes:
+### Logical volume usage & sizes:
 root_size=REST
 swap_size=DEFAULT
 data_size=
@@ -144,10 +150,6 @@ boot_fs=ext4
 root_fs=ext4
 swap_fs=swap
 data_fs=
-
-## Adjust only if installing to a secondary drive, or needing to keep old bootloader
-### Device to install grub (by any valid device path):
-grub_device=/dev/sda
 
 ## Adjust if you require another encryption scheme, see /proc/crypto
 ## Find the speeds on your hardware by: cryptsetup benchmark (and choose accordingly)
@@ -213,37 +215,36 @@ self=$(basename $BASH_SOURCE)
 ## If not run interactively, don't run
 [[ $- != *i* ]] && Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING" && exit 1
 ((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 4
-[[ -f /sys/firmware/efi ]] && Exit "This script doesn't yet work for UEFI installs!" && return 5
 
 ## Check existence of mandatory devices
-! [[ -w "$crypt_part" ]] && Exit "Crypt device does not exist or is not writable: '$crypt_part'" && return 6
-! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 7
+! [[ -w "$crypt_part" ]] && Exit "Crypt device does not exist or is not writable: '$crypt_part'" && return 5
+! [[ -w "$grub_device" ]] && Exit "Grub device does not exist or is not writable: '$grub_device'" && return 6
 
 ## Check names, labels, root_fs
-! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 8
-! [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] && Exit "Illegal format for hostname: '$hostname'" && return 9
-Checklabel crypt && return 10
-[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 11
-Checklabel boot && return 12
-Checklabel root && return 13
-Checklabel swap && return 14
-Checklabel data && return 15
+! [[ $username =~ ^[a-z_][a-z0-9_]*$ ]] && Exit "Illegal format for username: '$username'" && return 7
+! [[ $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] && Exit "Illegal format for hostname: '$hostname'" && return 8
+Checklabel crypt && return 9
+[[ -e /dev/$crypt_label ]] && Exit "Device /dev/$crypt_label exists, Volume Group name $crypt_label unavailable" && return 10
+Checklabel boot && return 11
+Checklabel root && return 12
+Checklabel swap && return 13
+Checklabel data && return 14
 ! [[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-		&& Exit "Wrong value for root_fs: '$root_fs'" && return 16
+		&& Exit "Wrong value for root_fs: '$root_fs'" && return 15
 
 ## Determine root and data partition usage & size
 [[ $root_size ]] && ! [[ $root_size = REST ]] && ! [[ $root_size = EXISTING ]] \
 		&& ! [[ $root_size =~ [1-9][0-9]*[MG] ]] \
-		&& Exit "Invalid format root_size: '$root_size'" && return 17
+		&& Exit "Invalid format root_size: '$root_size'" && return 16
 if [[ $data_size = REST ]]
 then
-	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST" && return 18
+	[[ $root_size = REST ]] && Exit "Settings data_size and root_size can't both be REST" && return 17
 	lvm_data='-l 100%FREE -Zy'
 else
 	if [[ $data_size ]]
 	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format data_size: '$data_size'" && return 19
+				&& Exit "Invalid format data_size: '$data_size'" && return 18
 		lvm_data="-L $data_size -Zy"
 	fi
 fi
@@ -256,15 +257,31 @@ else
 	if ! [[ $swap_size = EXISTING ]]
 	then
 		[[ $swap_size ]] && ! [[ $swap_size =~ [1-9][0-9]*[MG] ]] \
-				&& Exit "Invalid format swap_size: $swap_size" && return 20
+				&& Exit "Invalid format swap_size: $swap_size" && return 19
 		lvm_swap="-L $swap_size -Cy -Zy"
+	fi
+fi
+
+## Check type of setup
+gdisk=$(gdisk -l "$grub_device")
+if ! grep -q ' GPT: not present$' <<<"$gdisk"
+then  ## GPT partition scheme
+	if [[ -e /sys/firmware/efi ]]
+	then  ## UEFI
+		! grep -q "^Linux Mint 18" /etc/issue && Exit "UEFI only works on Linux Mint 18" && return 20
+		## It has to be a amd64 architecture that supports UEFI
+		read n discard <<<"$(grep ' EF00  EFI System$' <<<"$gdisk" |head -1)"
+		! [[ $n ]] && Exit "UEFI without type ef02 efi partition!" && return 21
+		efi_part="$grub_device$n"
+	else  ## non-UEFI GPT setup
+		! grep -q ' EF02  BIOS boot partition' <<<"$gdisk" && Exit "Non-UEFI GPT setup with no type ef02 grub partition!" && return 22
 	fi
 fi
 
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
 ## Encrypt
-pwf="/dev/shm/pw$RANDOM"
+pwf="/run/pw$RANDOM"
 >"$pwf"
 chmod 600 "$pwf"
 while [[ ! -s "$pwf" ]]
@@ -273,9 +290,9 @@ do
 	if [[ -s "$pwf" ]]
 	then
 		! grep -q "^$(/lib/cryptsetup/askpass "Enter the same password again: ")$" "$pwf" \
-				&& >"$pwf" && echo -e "Passwords not the same, do it again!\n"
+				&& >"$pwf" && echo -e "Passwords not the same, do it again\n"
 	else
-		echo -e "Empty password not allowed!\n"
+		echo -e "Empty password not allowed\n"
 	fi
 done
 
@@ -298,7 +315,7 @@ fi
 ## Decrypt if not yet mapped
 crypt_dev="/dev/mapper/$crypt_label"
 [[ ! -b "$crypt_dev" ]] && ! cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" \
-		&& Exit "Failed to open the encrypted partition $crypt_part" && return 21
+		&& Exit "Failed to open the encrypted partition $crypt_part" && return 23
 rm -- "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
@@ -315,7 +332,7 @@ then
 	! [[ -h $swap_dev ]] && lvcreate $lvm_swap -n $swap_label $crypt_label
 	if [[ $swap_fs ]]
 	then
-		! [[ $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" && return 22 \
+		! [[ $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" && return 24 \
 				|| mkswap -f -L $swap_label "$swap_dev"
 	fi
 fi
@@ -328,39 +345,39 @@ then  ## Create if it doesn't exist and format if required
 	then
 		data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
 		! [[ $data_fs ]] \
-				&& Exit "Data volume is not formatted; format first or fill in 'data_fs'" && return 23
+				&& Exit "Data volume is not formatted; format first or fill in 'data_fs'" && return 25
 	else
-		! [[ $data_fs ]] && Exit "Can't create data partition without format" && return 24
+		! [[ $data_fs ]] && Exit "Can't create data partition without format" && return 26
 		lvcreate $lvm_data -n $data_label $crypt_label
 		! Mkfs "$data_fs" "$data_label" "$data_dev" data \
-				&& Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" && return 25
+				&& Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" && return 27
 	fi
 fi
 [[ $root_size = REST ]] && ! [[ -h $root_dev ]] && lvcreate -l 100%FREE -Zy -n $root_label $crypt_label
 if [[ $root_fs ]]
 then
 	! Mkfs "$root_fs" "$root_label" "$root_dev" root \
-			&& Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" && return 26
+			&& Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" && return 28
 else
 	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
 	! [[ $root_fs ]] \
-			&& Exit "Root volume is not formatted; format first or fill in 'root_fs'" && return 27
+			&& Exit "Root volume is not formatted; format first or fill in 'root_fs'" && return 29
 	[[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs)$ ]] \
-			&& Exit "Root partition has unsupported filesystem: $root_fs" && return 28
+			&& Exit "Root partition has unsupported filesystem: $root_fs" && return 30
 fi
 
 if [[ $boot_part ]]
 then
 	! [[ $boot_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] \
-			&& Exit "Wrong value for boot_fs: '$boot_fs'" && return 29
+			&& Exit "Wrong value for boot_fs: '$boot_fs'" && return 31
 	if [[ $boot_fs ]]
 	then
 		! Mkfs "$boot_fs" "$boot_label" "$boot_part" boot \
-				&& Exit "Unsupported filesystem $boot_fs for boot-device $boot_dev with label $boot_label" && return 30
+				&& Exit "Unsupported filesystem $boot_fs for boot-device $boot_dev with label $boot_label" && return 32
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		! [[ $boot_fs ]] \
-				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty" && return 31
+				&& Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty" && return 33
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
@@ -394,6 +411,8 @@ else  ## regular Mint
 fi
 Echo "Copying takes a while..."
 cp -a "$rofs"/* "$target"
+mv $target/etc/apt/sources.list .
+cp /etc/apt/sources.list $target/etc/apt/sources.list
 
 ## Prepare root
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
@@ -449,7 +468,7 @@ mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
 useradd -ms /bin/bash $username
-pwf="/dev/shm/pw\$RANDOM"
+pwf="/run/pw\$RANDOM"
 >"\$pwf"
 chmod 600 "\$pwf"
 while [[ ! -s "\$pwf" ]]
@@ -458,9 +477,9 @@ do
 	if [[ -s "\$pwf" ]]
 	then
 		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \\
-				&& >"\$pwf" && echo -e "Passwords not the same, do it again!\n"
+				&& >"\$pwf" && echo -e "Passwords not the same, do it again\n"
 	else
-		echo -e "Empty password not allowed!\n"
+		echo -e "Empty password not allowed\n"
 	fi
 done
 chpasswd <<<"$username:\$(cat "\$pwf")"
@@ -482,8 +501,18 @@ X
 		&& echo "update-initramfs -c -k $(uname -r)"
 cat <<X
 chmod 600 "/boot/initrd.img-$(uname -r)"
-update-grub
-grub-install --force --recheck "$grub_device"
+if [[ "$efi_part" ]]
+then
+	mkdir /boot/grub/efi
+	mount "$efi_part" /boot/grub/efi
+	apt install -o Dpkg::Options::="--force-confold" --yes grub-efi
+	update-grub
+	grub-install --force --recheck --efi-directory=/boot/grub/efi "$grub_device"
+	umount /boot/grub/efi
+else
+	update-grub
+	grub-install --force --recheck "$grub_device"
+fi
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
