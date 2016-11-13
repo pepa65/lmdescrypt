@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.97
+version=0.97a
 
 ############################################################################
 #
-#  lmdescrypt 0.97
+#  lmdescrypt 0.97a
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -13,7 +13,6 @@ version=0.97
 #  or Linux Mint Debian Edition version 2 (201503),
 #  or regular Linux Mint 17.1, 17.2, 17.3 or 18 to be:
 #  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
-#  UEFI installs only work for Mint 18 (64-bit)
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -76,7 +75,7 @@ version=0.97
 ##  Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
 ##  Not having a separate boot partition is also supported: total encryption!
 ##  Multiple booting with other OSes also works out of the box.
-##  MBR, GPT partition tables and UEFI works according to configuration.
+##  MBR, GPT partition tables and UEFI work according to configuration.
 ##
 ############################################################################
 
@@ -92,7 +91,7 @@ grub_device=/dev/sda
 ## Specify the partitions you created by any valid device path, like:
 ## /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
 ## Total encryption: boot_part should be empty
-## UEFI setup: a efi partition (type ef00) of at least 200M should be there
+## UEFI setup: a efi partition (type ef00) of at least 260M with a VFAT filesystem should be there
 ## GPT (no UEFI) setup: a bios partition (type ef02) of at least 2M should be there
 ### Partitions to use:
 boot_part=
@@ -268,7 +267,6 @@ if ! grep -q ' GPT: not present$' <<<"$gdisk"
 then  ## GPT partition scheme
 	if [[ -e /sys/firmware/efi ]]
 	then  ## UEFI
-		! grep -q "^Linux Mint 18" /etc/issue && Exit "UEFI only works on Linux Mint 18" && return 20
 		## It has to be a amd64 architecture that supports UEFI
 		read n discard <<<"$(grep ' EF00  EFI System$' <<<"$gdisk" |head -1)"
 		! [[ $n ]] && Exit "UEFI without type ef02 efi partition!" && return 21
@@ -490,25 +488,39 @@ cat <<X
 rm "\$pwf"
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration
-if [[ -n "$packages" ]]
+if [[ "$efi_part" ]]
 then
-	apt-get update
-	apt-get --yes --reinstall install $packages
+	mkdir /media/cdrom
+	mount /dev/sr0 /media/cdrom
+	apt-cdrom -m add -d=/media/cdrom
+	sed -i 's/^deb /deb [arch=amd64] /g' /etc/apt/sources.list
+fi
+if [[ "$packages" ]]
+then
+	[[ "$efi_part" ]] || apt-get update
+	apt-get --yes install $packages
 fi
 X
-((lmde)) && echo "apt-get --yes purge '^live-.*'" \
-		&& echo 'rm -rvf /lib/live' \
-		&& echo "update-initramfs -c -k $(uname -r)"
+if ((lmde))
+then
+	echo "apt-get --yes purge '^live-.*'"
+	echo 'rm -rvf /lib/live'
+	echo "update-initramfs -c -k $(uname -r)"
+fi
 cat <<X
 chmod 600 "/boot/initrd.img-$(uname -r)"
 if [[ "$efi_part" ]]
 then
 	mkdir /boot/grub/efi
 	mount "$efi_part" /boot/grub/efi
-	apt install -o Dpkg::Options::="--force-confold" --yes grub-efi
-	update-grub
+	DEBIAN_FRONTEND=noninteractive apt install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
 	grub-install --force --recheck --efi-directory=/boot/grub/efi "$grub_device"
+	grep -q '^Linux Mint 17' /etc/issue && sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
+	update-grub
+	sed -i 's/^deb/#deb/' /etc/apt/sources.list
 	umount /boot/grub/efi
+	umount /media/cdrom
+	rmdir /media/cdrom
 else
 	update-grub
 	grub-install --force --recheck "$grub_device"
@@ -538,7 +550,7 @@ sleep 1
 vgchange -an
 sync
 sleep 1
-cryptsetup luksClose $crypt_label
+! cryptsetup luksClose $crypt_label && Exit "Not able to cleanly close crypt" && return 34
 sync
 
 Echo "Ready for reboot!"
