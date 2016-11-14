@@ -3,7 +3,8 @@
 ### version 0.97a
 
 This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503),
-or regular Linux Mint 17.1, 17.2, 17.3 or 18, either i686 or amd64, to be:<br>
+or regular Linux Mint 17.1, 17.2, 17.3 or 18, either i686 or amd64,
+whether with MSDOS or GPT partitions, UEFI or not, to be:<br>
 *Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data).*<br>
 
 Shortlink to download the script: http://j.mp/lmdescrypt
