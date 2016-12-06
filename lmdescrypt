@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.97a
+version=0.97b
 
 ############################################################################
 #
-#  lmdescrypt 0.97a
+#  lmdescrypt 0.97b
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -262,7 +262,7 @@ else
 fi
 
 ## Check type of setup
-gdisk=$(gdisk -l "$grub_device")
+gdisk=$(echo 2 |gdisk -l "$grub_device")
 if ! grep -q ' GPT: not present$' <<<"$gdisk"
 then  ## GPT partition scheme
 	if [[ -e /sys/firmware/efi ]]
