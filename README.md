@@ -1,18 +1,17 @@
 # lmdescrypt
-### version 0.97c
+### version 0.98
 
 This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 and
 201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18 and 18.1, either
-i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not, to be:<br>
-*Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data).*
+i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not. The result is:
 
-Shortlink to download the script: http://j.mp/lmdescrypt
+**A fully LUKS encrypted system, with LVM2 volumes of root and swap (and
+optionally: data) with optional boot partition (with optional boot-from-iso-file too).**
 
-Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
-
-Github page: https://github.com/pepa65/lmdescrypt
-
-Questions?  solusos@passchier.net or post an Issue on the github page
+* Download shortlink for the script: http://j.mp/lmdescrypt
+* Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
+* Github page: https://github.com/pepa65/lmdescrypt
+* Questions?  solusos@passchier.net or post an Issue on the github page
 
 ## INSTRUCTIONS
 
@@ -58,7 +57,7 @@ source lmdescrypt
 ```
 
 **6. Answer the questions as they come up:**
-* password for encryption (three or four times, depending!)
+* set password for encryption
 
 Then after a wait for all the preparations to have happened, and supply:
 * set password for user
@@ -69,9 +68,7 @@ Then after a wait for all the preparations to have happened, and supply:
 
 ### Installing into a pre-existing environment
 
-Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
-
-Not having a separate boot partition is also supported: total encryption!
-
-Multiple booting with other OSes also works out of the box.
-MBR, GPT partition tables and UEFI work according to configuration.
+* Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
+* Not having a separate boot partition is also supported: total encryption!
+* Multiple booting with other OSes also works out of the box.
+* MBR, GPT partition tables and UEFI work according to configuration.

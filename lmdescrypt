@@ -1,25 +1,23 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.97c
+version=0.98
 
 ############################################################################
 #
-#  lmdescrypt 0.97c
+#  lmdescrypt 0.98
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 or 
-#  201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18 and 18.1, either
-#  i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not, to be:
-#  Fully LUKS encrypted, with lvm2 volumes of root and swap (and optionally: data)
+#  201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18 and 18.1, either i686
+#  or amd64, whether with MSDOS or GPT partitions, UEFI or not. The result:
+# A fully LUKS encrypted system, with LVM2 volumes of root and swap (and
+# optionally: data) with optional boot partition (with optional boot-from-iso-file).
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
-#
 # Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
-#
 # Github page: https://github.com/pepa65/lmdescrypt
-#
 # Questions? Email solusos@passchier.net or post an Issue on the github page.
 #
 ############################################################################
@@ -63,7 +61,7 @@ version=0.97c
 ##> source lmdescrypt
 ##
 ### 6. Answer the questions as they come up:
-##  - password for encryption
+##  - set password for encryption
 ##  Then after a wait for all the preparations to have happened:
 ##  - set password for user
 ##  - set timezone
@@ -72,7 +70,8 @@ version=0.97c
 ### And that's it!
 ##
 ### Installing into a pre-existing environment
-##  Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes is entirely supported.
+##  Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes
+##   is entirely supported.
 ##  Not having a separate boot partition is also supported: total encryption!
 ##  Multiple booting with other OSes also works out of the box.
 ##  MBR, GPT partition tables and UEFI work according to configuration.
@@ -96,6 +95,10 @@ grub_device=/dev/sda
 ### Partitions to use:
 boot_part=
 crypt_part=/dev/sda1
+
+## When boot_part is not set, this is ignored
+### Set to 1 to include this iso as file on boot partition to boot from
+include_isofile=1
 
 ## When booting with total encryption, it is necessary to enter the password
 ##  twice, once for grub and once for the kernel to decrypt the LUKS partition
@@ -407,7 +410,7 @@ else  ## regular Mint
 	lmde=0
 	rofs=$rofslm
 fi
-Echo "Copying takes a while..."
+Echo "Copying the system files..."
 cp -a "$rofs"/* "$target"
 mv $target/etc/apt/sources.list .
 cp /etc/apt/sources.list $target/etc/apt/sources.list
@@ -436,6 +439,29 @@ then
 	sed -i 's@ splash"$@"@' "$target/etc/default/grub"
 else
 	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
+	((include_isofile)) && {
+		cd=$(df |grep -o '^/dev/sr..')
+		isoname=$(grep '^GRUB_TITLE=' "$target/etc/linuxmint/info")
+		isoname=${isoname/GRUB_TITLE=/}
+		isofile="/$(date +%s).iso"
+		Echo "Copying the iso..."
+		dd if=$cd of="$target/boot$isofile"
+		(cd "$target/boot"; ln -s "$isofile" "$isoname")
+		((lmde)) && dir=live || dir=casper
+		sdxn=$(readlink -e "$boot_part")
+		x=$(grep -o '/sd.' <<<"$sdxn")
+		root="hd$(($(printf '%d' "'${x: -1}")-97)),msdos${sdxn//[^0-9]/}"
+		echo "ISO $isoname is on ($root)$isofile"
+		cat <<-X >>"$target/etc/grub.d/40_custom"
+			menuentry "Boot from ISO $isoname ($isofile)" {
+			  set root='$root'
+			  set isofile='$isofile'
+			  loopback loop \$isofile
+			  linux (loop)/$dir/vmlinuz boot=$dir iso-scan/filename=\$isofile noeject noprompt splash -- 
+			  initrd (loop)/$dir/initrd.lz
+			}
+		X
+	}
 fi
 sed -i 's/^GRUB_TIMEOUT=10/GRUB_TIMEOUT=4/' "$target/etc/default/grub"
 sed -i 's/^GRUB_HIDDEN_TIMEOUT=0/#GRUB_HIDDEN_TIMEOUT=0/' "$target/etc/default/grub"
