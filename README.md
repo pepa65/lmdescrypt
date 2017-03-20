@@ -59,7 +59,7 @@ source lmdescrypt
 **6. Answer the questions as they come up:**
 * set password for encryption
 
-Then after a wait for all the preparations to have happened, and supply:
+Then after all the preparations have happened:
 * set password for user
 * set timezone
 * configure keyboard
