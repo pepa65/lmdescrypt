@@ -1,8 +1,8 @@
 # lmdescrypt
-### version 0.98
+### version 0.981
 
 This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 and
-201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18 and 18.1, either
+201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1 and 18.2, either
 i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not. The result is:
 
 **A fully LUKS encrypted system, with LVM2 volumes of root and swap (and
@@ -37,6 +37,8 @@ For example, (re)partition the drive like this
 ```
 fdisk /dev/sda
 ```
+(If swap partitions were present, they would be automatically mounted...
+Unmount them with `swapoff -a`)
 
 Within fdisk, enter the following:
 ```

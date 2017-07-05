@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.98
+version=0.981
 
 ############################################################################
 #
-#  lmdescrypt 0.98
+#  lmdescrypt 0.981
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -55,6 +55,10 @@ version=0.98
 ##  w [Enter]
 ##
 ##  (This is giving all space to the encrypted lvm2)
+##  If swap partitions were present, they would be automatically mounted...
+##  Unmount them with:
+##
+##> swapoff -a
 ##
 ### 5. Start the script:
 ##
