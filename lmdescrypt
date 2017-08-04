@@ -254,7 +254,7 @@ then
 		Exit "Settings data_size and root_size can't both be REST" && return 17
 	lvm_data='-l 100%FREE -Zy'
 else
-	if [[ $data_size ]]
+	if [[ $data_size && ! $data_size != EXISTING ]]
 	then
 		! [[ $data_size =~ [1-9][0-9]*[MG] ]] &&
 			Exit "Invalid format data_size: '$data_size'" && return 18
@@ -526,7 +526,7 @@ pwf="/run/pw\$RANDOM"
 chmod 600 "\$pwf"
 while [[ ! -s "\$pwf" ]]
 do
-	/lib/cryptsetup/askpass "Enter user password: " >"\$pwf"
+	/lib/cryptsetup/askpass "Enter password for user \$username: " >"\$pwf"
 	if [[ -s "\$pwf" ]]
 	then
 		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \\
