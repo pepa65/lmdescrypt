@@ -526,7 +526,7 @@ pwf="/run/pw\$RANDOM"
 chmod 600 "\$pwf"
 while [[ ! -s "\$pwf" ]]
 do
-	/lib/cryptsetup/askpass "Enter password for user \$username: " >"\$pwf"
+	/lib/cryptsetup/askpass "Enter password for user $username: " >"\$pwf"
 	if [[ -s "\$pwf" ]]
 	then
 		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again: ")\$" "\$pwf" \\
