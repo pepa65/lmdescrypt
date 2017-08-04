@@ -277,6 +277,7 @@ fi
 
 ## Check type of setup
 gdisk=$(echo 2 |gdisk -l "$grub_device")
+efi_part=
 if ! grep -q ' GPT: not present$' <<<"$gdisk"
 then  ## GPT partition scheme
 	if [[ -e /sys/firmware/efi ]]
