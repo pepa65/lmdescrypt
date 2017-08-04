@@ -184,7 +184,11 @@ Echo(){ ## $1=message
 
 ## To really exit it needs to be followed by 'return' in the main body!
 Exit(){ ## $1=message
-	Echo "  ERROR: $1\n  ABORTING";
+	Echo "  ERROR: $1\n  ABORTING"
+}
+
+Warning(){ ## $1=message
+	echo -e "\n  WARNING: $1\n"
 }
 
 Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
@@ -288,7 +292,7 @@ then  ## GPT partition scheme
 		efi_part="$grub_device$n"
 	else  ## non-UEFI GPT setup
 		! grep -q ' EF02  BIOS boot partition' <<<"$gdisk" &&
-			echo "WARNING: Non-UEFI GPT setup with no type ef02 grub partition!"
+			Warning "Non-UEFI GPT setup with no type ef02 grub partition"
 	fi
 fi
 
@@ -316,7 +320,7 @@ then
 	cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwf"
 else
 	cryptsetup isLuks "$crypt_part" &&
-		echo -e "\n  $crypt_part is already formatted, reencryption not forced" ||
+		Warning "$crypt_part is already formatted, reencryption not forced" ||
 		cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwf"
 fi
 
@@ -336,7 +340,7 @@ crypt_dev="/dev/mapper/$crypt_label"
 rm -- "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
-## Make lvm2 volumes if not there yet and format if wanted
+## Make lvm2 volumes if not there yet and make filesystems if wanted
 vgchange -ay
 vg_dev="/dev/mapper/$vg_label"
 [[ "  $vg_label" = "$(vgs --noheadings -o vg_name)" ]] ||
@@ -362,21 +366,25 @@ fi
 	lvcreate -L $root_size -Zy -n $root_label $vg_label
 if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
-	if [[ -h $data_dev ]]
-	then
-		[[ $data_size = EXISTING && -z $data_fs ]] &&
-			data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
-	else
-		[[ $data_size = EXISTING ]] &&
-			Exit "There is no existing data device $data_dev" && return 23
+	[[ ! -h $data_dev && $data_size = EXISTING ]] &&
+		Exit "There is no existing data device $data_dev" && return 23
 		lvcreate $lvm_data -n $data_label $vg_label
+	if [[ $data_fs ]]
+	then
+		! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
+			Exit "Unsupported filesystem $data_fs for data volume $data_dev with label $data_label" &&
+			return 24
+	else  ## No data filesystem specified: existing or bust
+		if [[ $data_size = EXISTING ]]
+		then
+			! data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null) &&
+				Exit "No filesystem specified for data volumeand none present" &&
+				return 25
+		else
+			Exit "No filesystem specified for data volume"
+			return 26
+		fi
 	fi
-	! [[ $data_fs ]] &&
-		Exit "Data volume is not formatted; format first or fill in 'data_fs'" &&
-		return 24
-	! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
-		Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" &&
-		return 25
 fi
 [[ $root_size = REST ]] && ! [[ -h $root_dev ]] &&
 	lvcreate -l 100%FREE -Zy -n $root_label $vg_label
@@ -384,30 +392,30 @@ if [[ $root_fs ]]
 then
 	! Mkfs "$root_fs" "$root_label" "$root_dev" root &&
 		Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" &&
-		return 26
+		return 27
 else
 	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
 	! [[ $root_fs ]] &&
-		Exit "Root volume is not formatted; format first or fill in 'root_fs'" &&
-		return 27
+		Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
+		return 28
 	[[ $root_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs)$ ]] &&
-		Exit "Root partition has unsupported filesystem: $root_fs" && return 28
+		Exit "Root partition has unsupported filesystem: $root_fs" && return 29
 fi
 
 if [[ $boot_part ]]
 then
 	! [[ $boot_fs =~ ^(ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
-		Exit "Wrong value for boot_fs: '$boot_fs'" && return 29
+		Exit "Wrong value for boot_fs: '$boot_fs'" && return 30
 	if [[ $boot_fs ]]
 	then
 		! Mkfs "$boot_fs" "$boot_label" "$boot_part" boot &&
 			Exit "Unsupported filesystem $boot_fs for boot-device $boot_part with label $boot_label" &&
-			return 30
+			return 31
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		! [[ $boot_fs ]] &&
-			Exit "Boot partition $boot_part is not formatted; format first or fill in 'boot_fs' or leave boot_part empty" &&
-			return 31
+			Exit "Boot partition $boot_part has no filesystem, fill in 'boot_fs' (or leave boot_part empty)" &&
+			return 32
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
@@ -599,9 +607,9 @@ Echo "Finalizing settings on the install"
 chroot "$target" "$inside"
 
 [[ $(df --output=pcent $target |tail -1) = 100% ]] &&
-	Exit "The filesystem on $root_dev is 100% full" && return 32
+	Exit "The filesystem on $root_dev is 100% full" && return 33
 [[ $boot_part && $(df --output=pcent $target/boot |tail -1) = 100% ]] &&
-	Exit "The filesystem on $boot_part is 100% full" && return 33
+	Exit "The filesystem on $boot_part is 100% full" && return 34
 
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
@@ -610,11 +618,11 @@ umount "$target"
 [[ $swap_size ]] && swapoff "$swap_dev"
 sync
 sleep 1
-! vgchange -an && Exit "Not able to close all logical volumes" && return 34
+! vgchange -an && Exit "Not able to close all logical volumes" && return 35
 sync
 sleep 1
 ! cryptsetup luksClose $crypt_label && Exit "Not able to cleanly close crypt" &&
-	return 35
+	return 36
 sync
 
 Echo "Ready for reboot!"
