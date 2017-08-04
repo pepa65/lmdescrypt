@@ -329,8 +329,9 @@ fi
 ## Decrypt if not yet mapped
 crypt_dev="/dev/mapper/$crypt_label"
 [[ ! -b "$crypt_dev" ]] &&
-	cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" &&
-	Exit "Failed to open the encrypted partition $crypt_part" && return 21
+	! cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" &&
+	rm -- "$pwf" && Exit "Failed to open the encrypted partition $crypt_part" &&
+	return 21
 rm -- "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
@@ -338,7 +339,7 @@ crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 vgchange -ay
 vg_dev="/dev/mapper/$vg_label"
 [[ "  $vg_label" = "$(vgs --noheadings -o vg_name)" ]] ||
-	vgcreate -Zy $vg_label $vg_dev
+	vgcreate -Zy $vg_label $crypt_dev
 root_dev="/dev/$vg_label/$root_label"
 data_dev="/dev/$vg_label/$data_label"
 swap_dev="/dev/$vg_label/$swap_label"
@@ -362,20 +363,19 @@ if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
 	if [[ -h $data_dev ]]
 	then
-		data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
-		! [[ $data_fs ]] &&
-			Exit "Data volume is not formatted; format first or fill in 'data_fs'" &&
-			return 23
+		[[ $data_size = EXISTING && -z $data_fs ]] &&
+			data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null)
 	else
 		[[ $data_size = EXISTING ]] &&
 			Exit "There is no existing data device $data_dev" && return 24
-		! [[ $data_fs ]] &&
-			Exit "Can't create data partition without format" && return 25
 		lvcreate $lvm_data -n $data_label $vg_label
-		! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
-			Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" &&
-			return 26
 	fi
+	! [[ $data_fs ]] &&
+		Exit "Data volume is not formatted; format first or fill in 'data_fs'" &&
+		return 25
+	! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
+		Exit "Unsupported filesystem $data_fs for data-device $data_dev with label $data_label" &&
+		return 26
 fi
 [[ $root_size = REST ]] && ! [[ -h $root_dev ]] &&
 	lvcreate -l 100%FREE -Zy -n $root_label $vg_label
@@ -514,7 +514,7 @@ inside="/root/$self.inside"
 #!/bin/bash
 set +o verbose -o errtrace
 export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-lvmetad -p /pid
+lvmetad -p /lvm.pid
 mount -t sysfs sys /sys
 mount -t proc proc /proc
 mount -t devpts pts /dev/pts
@@ -584,8 +584,7 @@ gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
 umount /sys
-kill -9 \$(cat /pid)
-rm /pid
+[[ -f /lvm.pid ]] && kill -9 \$(cat /lvm.pid) && rm /lvm.pid
 exit 0
 X
 ) >"$target$inside"
