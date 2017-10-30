@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.982
+version=0.983
 
 ############################################################################
 #
-#  lmdescrypt 0.982
+#  lmdescrypt 0.983
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -299,16 +299,17 @@ fi
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
 ## Encrypt
-pwf="/run/pw$RANDOM"
->"$pwf"
-chmod 600 "$pwf"
+pwf=$(mktemp) pwf2=$(mktemp)
+chmod 600 "$pwf" "$pwf2"
 while [[ ! -s "$pwf" ]]
 do
 	/lib/cryptsetup/askpass "Enter encryption password:" >"$pwf"
 	if [[ -s "$pwf" ]]
 	then
-		! grep -q "^$(/lib/cryptsetup/askpass "Enter the same password again:")$" "$pwf" &&
-			>"$pwf" && echo -e "Passwords not the same, do it again\n"
+		/lib/cryptsetup/askpass "Enter the same password again:" >"$pwf2"
+		diff -q --label $'\b\b\b\b\b\b\b\bFirst' "$pwf" --label "second password" "$pwf2" ||
+			shred -u "$pwf"
+		shred -u "$pwf2"
 	else
 		echo -e "Empty password not allowed\n"
 	fi
@@ -335,9 +336,9 @@ fi
 crypt_dev="/dev/mapper/$crypt_label"
 [[ ! -b "$crypt_dev" ]] &&
 	! cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" &&
-	rm -- "$pwf" && Exit "Failed to open the encrypted partition $crypt_part" &&
+	shred -u "$pwf" && Exit "Failed to open the encrypted partition $crypt_part" &&
 	return 21
-rm -- "$pwf"
+shred -u "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
 ## Make lvm2 volumes if not there yet and make filesystems if wanted
@@ -534,16 +535,17 @@ mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
 useradd -ms /bin/bash $username
-pwf="/run/pw\$RANDOM"
->"\$pwf"
-chmod 600 "\$pwf"
+pwf=\$(mktemp) pwf2=\$(mktemp)
+chmod 600 "\$pwf" "\$pwf2"
 while [[ ! -s "\$pwf" ]]
 do
 	/lib/cryptsetup/askpass "Enter password for user $username:" >"\$pwf"
 	if [[ -s "\$pwf" ]]
 	then
-		! grep -q "^\$(/lib/cryptsetup/askpass "Enter the same password again:")\$" "\$pwf" \\
-				&& >"\$pwf" && echo -e "Passwords not the same, do it again\n"
+		/lib/cryptsetup/askpass "Enter the same password again:" >"\$pwf2"
+		diff -q --label \$'\b\b\b\b\b\b\b\bFirst' "\$pwf" --label "second password"	"\$pwf2" ||
+			shred -u "\$pwf"
+		shred "\$pwf2"
 	else
 		echo -e "Empty password not allowed\n"
 	fi
@@ -553,7 +555,7 @@ addgroup $username sudo
 X
 ((lmde)) && echo 'chpasswd <<<"root:$(cat "$pwf")"' || echo 'passwd -l root'
 cat <<X
-rm "\$pwf"
+shred -u "\$pwf"
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration 2>/dev/null
 if [[ "$efi_part" ]]
