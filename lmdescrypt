@@ -1,19 +1,20 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.983
+version=0.984
 
 ############################################################################
 #
-#  lmdescrypt 0.983
+#  lmdescrypt 0.984
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 or 
-#  201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1 or 18.2, either
-#  i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not. The result:
-# A fully LUKS encrypted system, with LVM2 volumes of root and swap (and
-# optionally: data) with optional boot partition (with optional boot-from-iso-file).
+#  201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1, 18.2 or 18.3,
+#  either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
+# The result: a fully LUKS encrypted system, with LVM2 volumes of root and swap
+#  (and optionally: data) with optional boot partition
+#  (with optional boot-from-iso-file).
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 # Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
@@ -45,20 +46,15 @@ version=0.983
 ## For example, (re)partition the drive like this
 ##  (erasing all, taking up all space):
 ##
-##> fdisk /dev/sda
-##  o [Enter]
-##  n [Enter]
-##  [Enter]
-##  [Enter]
-##  [Enter]
-##  [Enter]
-##  w [Enter]
+##> swapoff -a  # unmount all automounted swap partitions
 ##
-##  (This is giving all space to the encrypted lvm2)
-##  If swap partitions were present, they would be automatically mounted...
-##  Unmount them with:
+##> sgdisk -Zon1::+2M -t1:ef02 -c1:BIOS -n 2::-0 -t2:8e00 -c2:X -g /dev/sda
 ##
-##> swapoff -a
+## For a UEFI setup instead, this example works:
+##
+##> sgdisk -Zon1::+260M -t1:ef00 -c1:EFI -n2::-0 -t2:8e00 -c2:X -g /dev/sda
+##
+##  (This is giving almost all space to the encrypted lvm2)
 ##
 ### 5. Start the script:
 ##
@@ -94,8 +90,9 @@ grub_device=/dev/sda
 ## Specify the partitions you created by any valid device path, like:
 ## /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
 ## Total encryption: boot_part should be empty
-## UEFI setup: a efi partition (type ef00) of at least 260M with a VFAT filesystem should be there
-## GPT (no UEFI) setup: a bios partition (type ef02) of at least 2M should be there
+## UEFI setup: Must have an efi partition (type ef00) of at least 260M with a
+##  VFAT filesystem, will be formatted if not yet formatted!
+## GPT (non-UEFI) setup: Must have a bios partition (type ef02) of at least 2M!
 ### Partitions to use:
 boot_part=
 crypt_part=/dev/sda1
@@ -285,14 +282,15 @@ efi_part=
 if ! grep -q ' GPT: not present$' <<<"$gdisk"
 then  ## GPT partition scheme
 	if [[ -e /sys/firmware/efi ]]
-	then  ## UEFI
-		## It has to be a amd64 architecture that supports UEFI
-		read n discard <<<"$(grep ' EF00  EFI System$' <<<"$gdisk" |head -1)"
-		! [[ $n ]] && Exit "UEFI without type ef02 efi partition!" && return 20
+	then  ## UEFI: so it is an amd64 architecture that supports UEFI
+		read n discard <<<"$(grep ' EF00  ' <<<"$gdisk" |head -1)"
+		! [[ $n ]] && Exit "UEFI without type ef00 efi partition!" && return 20
 		efi_part="$grub_device$n"
+		[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
+			mkfs.vfat -n EFI "$efi_part"
 	else  ## non-UEFI GPT setup
-		! grep -q ' EF02  BIOS boot partition' <<<"$gdisk" &&
-			Warning "Non-UEFI GPT setup with no type ef02 grub partition"
+		! grep -q ' EF02  ' <<<"$gdisk" &&
+			Exit "Non-UEFI GPT setup without type ef02 bios partition" && return 21
 	fi
 fi
 

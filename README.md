@@ -1,12 +1,14 @@
 # lmdescrypt
-### version 0.983
+### version 0.984
 
 This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 and
-201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1 and 18.2, either
-i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not. The result is:
+201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1, 18.2 or 18.3,
+either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
+The result is:
 
 **A fully LUKS encrypted system, with LVM2 volumes of root and swap (and
-optionally: data) with optional boot partition (with optional boot-from-iso-file too).**
+optionally: data) with optional boot partition
+(with optional boot-from-iso-file too).**
 
 * Download shortlink for the script: http://j.mp/lmdescrypt
 * Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
@@ -35,22 +37,13 @@ For example, (re)partition the drive like this
 (erasing all, taking up all space):
 
 ```
-fdisk /dev/sda
-```
-(If swap partitions were present, they would be automatically mounted...
-Unmount them with `swapoff -a`)
+# Turn off swap partitions that were automounted
+swapoff -a
 
-Within fdisk, enter the following:
+# This ERASES the whole disk!
+sgdisk -Zon1::+2M -t1:ef02 -c1:BIOS -n2::-0 -t2:8e00 -c2:X /dev/sda
 ```
- o [Enter]
- n [Enter]
- [Enter]
- [Enter]
- [Enter]
- [Enter]
- w [Enter]
-```
-This is giving all space to the encrypted lvm2
+This is giving almost the whole drive to the encrypted lvm2
 
 **5. Start the script:**
 
