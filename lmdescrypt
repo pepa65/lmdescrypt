@@ -54,7 +54,7 @@ version=0.985
 ##
 ##> sgdisk -Zon1::+260M -t1:ef00 -c1:EFI -n2::-0 -t2:8e00 -c2:X -g /dev/sda
 ##
-##  (This is giving almost all space to the encrypted lvm2)
+##  (This is giving almost the whole drive to the encrypted lvm2)
 ##
 ### 5. Start the script:
 ##

@@ -1,5 +1,5 @@
 # lmdescrypt
-### version 0.984
+### version 0.985
 
 This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 and
 201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1, 18.2 or 18.3,
@@ -37,11 +37,14 @@ For example, (re)partition the drive like this
 (erasing all, taking up all space):
 
 ```
-# Turn off swap partitions that were automounted
+# Unmount all automounted swap partitions
 swapoff -a
 
 # This ERASES the whole disk!
-sgdisk -Zon1::+2M -t1:ef02 -c1:BIOS -n2::-0 -t2:8e00 -c2:X /dev/sda
+sgdisk -Zon1::+2M -t1:ef02 -c1:BIOS -n2::-0 -t2:8e00 -c2:X -g /dev/sda
+
+# For a UEFI setup instead, this example works:
+sgdisk -Zon1::+260M -t1:ef00 -c1:EFI -n2::-0 -t2:8e00 -c2:X -g /dev/sda
 ```
 This is giving almost the whole drive to the encrypted lvm2
 
