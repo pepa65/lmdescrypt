@@ -1,11 +1,11 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.984
+version=0.985
 
 ############################################################################
 #
-#  lmdescrypt 0.984
+#  lmdescrypt 0.985
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
@@ -95,7 +95,7 @@ grub_device=/dev/sda
 ## GPT (non-UEFI) setup: Must have a bios partition (type ef02) of at least 2M!
 ### Partitions to use:
 boot_part=
-crypt_part=/dev/sda1
+crypt_part=/dev/sda2
 
 ## When boot_part is not set, this is ignored
 ### Set to 1 to include this iso as file on boot partition to boot from
@@ -302,9 +302,11 @@ chmod 600 "$pwf" "$pwf2"
 while [[ ! -s "$pwf" ]]
 do
 	/lib/cryptsetup/askpass "Enter encryption password:" >"$pwf"
+	echo
 	if [[ -s "$pwf" ]]
 	then
 		/lib/cryptsetup/askpass "Enter the same password again:" >"$pwf2"
+		echo
 		diff -q --label $'\b\b\b\b\b\b\b\bFirst' "$pwf" --label "second password" "$pwf2" ||
 			shred -u "$pwf"
 		shred -u "$pwf2"
@@ -526,7 +528,7 @@ inside="/root/$self.inside"
 #!/bin/bash
 set +o verbose -o errtrace
 export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-lvmetad -p /lvm.pid
+hash -l lvmetad && lvmetad -p /lvm.pid
 mount -t sysfs sys /sys
 mount -t proc proc /proc
 mount -t devpts pts /dev/pts
@@ -537,10 +539,12 @@ pwf=\$(mktemp) pwf2=\$(mktemp)
 chmod 600 "\$pwf" "\$pwf2"
 while [[ ! -s "\$pwf" ]]
 do
-	/lib/cryptsetup/askpass "Enter password for user $username:" >"\$pwf"
+	/lib/cryptsetup/askpass "Enter password for user $username: " >"\$pwf"
+	echo
 	if [[ -s "\$pwf" ]]
 	then
-		/lib/cryptsetup/askpass "Enter the same password again:" >"\$pwf2"
+		/lib/cryptsetup/askpass "Enter the same password again: " >"\$pwf2"
+		echo
 		diff -q --label \$'\b\b\b\b\b\b\b\bFirst' "\$pwf" --label "second password"	"\$pwf2" ||
 			shred -u "\$pwf"
 		shred "\$pwf2"
@@ -585,6 +589,8 @@ then
 	grub-install --force --recheck --efi-directory=/boot/grub/efi "$grub_device"
 	grep -q '^Linux Mint 17' /etc/issue && sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
 	update-grub
+	mkdir /boot/grub/efi/EFI/boot
+	cp /boot/grub/efi/EFI/*/grubx64.efi /boot/grub/efi/EFI/boot/bootx64.efi
 	sed -i 's/^deb/#deb/' /etc/apt/sources.list
 	umount /boot/grub/efi
 	umount /media/cdrom
