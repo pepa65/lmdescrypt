@@ -1,15 +1,15 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.985
+version=0.986
 
 ############################################################################
 #
-#  lmdescrypt 0.985
+#  lmdescrypt 0.986
 #
 # Shortlink to download the script: http://j.mp/lmdescrypt
 #
-# This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 or 
+# This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 or
 #  201701), or regular Linux Mint 17.1, 17.2, 17.3 or 18, 18.1, 18.2 or 18.3,
 #  either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
 # The result: a fully LUKS encrypted system, with LVM2 volumes of root and swap
@@ -98,6 +98,7 @@ boot_part=
 crypt_part=/dev/sda2
 
 ## When boot_part is not set, this is ignored
+## If the boot partition is too small, the install will fail in the end!
 ### Set to 1 to include this iso as file on boot partition to boot from
 include_isofile=1
 
@@ -158,7 +159,7 @@ data_fs=
 ## Find the speeds on your hardware by: cryptsetup benchmark (and choose accordingly)
 ## The -i parameter is the number of milliseconds spend iterating on THIS system
 ### Parameters for cryptsetup luksFormat:
-cryptopts='-c aes-xts-plain64 -s 512 -h sha512 -i 3000'
+cryptopts='-s 512 -h sha512 -i 5000'
 
 ## Adjust according to preference
 ### Username and hostname (no spaces):
@@ -192,7 +193,7 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 	case $1 in
 		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) ! [[ $4 = data ]] && return 2 ;;&
 		## Continue even if the above pattern matched (unless $4 isn't data)
-		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
+		ext2|ext3|ext4) echo 'y' |mkfs.$1 -F -L "$2" "$3" ;;
 		hfs) mkfs.$1 -h -v "$2" "$3" ;;
 		hfsplus) mkfs.$1 -J -v "$2" "$3" ;;
 		jfs) mkfs.$1 -q -L "$2" "$3" ;;
@@ -358,7 +359,7 @@ then
 	then
 		! [[ $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" &&
 			return 22 ||
-			mkswap -f -L $swap_label "$swap_dev"
+			echo 'y' |mkswap -f -L $swap_label "$swap_dev"
 	fi
 fi
 
@@ -591,7 +592,6 @@ then
 	update-grub
 	mkdir /boot/grub/efi/EFI/boot
 	cp /boot/grub/efi/EFI/*/grubx64.efi /boot/grub/efi/EFI/boot/bootx64.efi
-	sed -i 's/^deb/#deb/' /etc/apt/sources.list
 	umount /boot/grub/efi
 	umount /media/cdrom
 	rmdir /media/cdrom
@@ -599,6 +599,7 @@ else
 	update-grub
 	grub-install --force --recheck "$grub_device"
 fi
+sed -i 's/^deb cdrom/#deb cdrom/' /etc/apt/sources.list
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
