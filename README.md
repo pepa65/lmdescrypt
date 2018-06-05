@@ -12,8 +12,8 @@ optionally: data) with optional boot partition
 
 * Download shortlink for the script: http://j.mp/lmdescrypt
 * Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
-* Github page: https://github.com/pepa65/lmdescrypt
-* Questions?  solusos@passchier.net or post an Issue on the github page
+* Gitlab page: https://gitlab.com/pepa65/lmdescrypt
+* Questions?  solusos@passchier.net or post an Issue on the gitlab page
 
 ## INSTRUCTIONS
 
