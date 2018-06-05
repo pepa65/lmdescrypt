@@ -10,7 +10,7 @@ The result is:
 optionally: data) with optional boot partition
 (with optional boot-from-iso-file too).**
 
-* Download shortlink for the script: http://j.mp/lmdescrypt
+* Download shortlink for the script: http://4e4.win/lmdescrypt
 * Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
 * Gitlab page: https://gitlab.com/pepa65/lmdescrypt
 * Questions?  solusos@passchier.net or post an Issue on the gitlab page
@@ -23,7 +23,7 @@ optionally: data) with optional boot partition
 
 ```
 sudo -i
-wget j.mp/lmdescrypt
+wget 4e4.win/lmdescrypt
 ```
 
 **3. If needed, adapt the SETTINGS section:**
