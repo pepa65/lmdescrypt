@@ -461,7 +461,9 @@ cp /etc/apt/sources.list $target/etc/apt/sources.list
 
 ## Prepare root
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
-echo "$root_dev / $root_fs relatime,errors=remount-ro 0 1" >>"$target/etc/fstab"
+[[ $root_fs = btrfs ]] &&
+	echo "$root_dev / $root_fs defaults,compress 0 1" >>"$target/etc/fstab" ||
+	echo "$root_dev / $root_fs defaults,relatime,errors=remount-ro 0 1" >>"$target/etc/fstab"
 [[ $swap_size ]] && echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
 [[ $data_size ]] && echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
 p3=none p4=luks
