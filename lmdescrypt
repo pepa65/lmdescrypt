@@ -456,8 +456,8 @@ else  ## regular Mint
 fi
 Echo "Copying the system files..."
 cp -a "$rofs"/* "$target"
+rm $target/etc/apt/sources.list .
 ! grep -q 'Linux Mint 19' /etc/os-release &&
-	mv $target/etc/apt/sources.list . &&
 	cp /etc/apt/sources.list $target/etc/apt/sources.list
 
 ## Prepare root
@@ -606,7 +606,7 @@ else
 	update-grub
 	grub-install --force --recheck "$grub_device"
 fi
-sed -i 's/^deb cdrom/#deb cdrom/' /etc/apt/sources.list
+sed -i 's/^deb.* cdrom:.*/#\0/' /etc/apt/sources.list
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
