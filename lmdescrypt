@@ -456,8 +456,9 @@ else  ## regular Mint
 fi
 Echo "Copying the system files..."
 cp -a "$rofs"/* "$target"
-mv $target/etc/apt/sources.list .
-cp /etc/apt/sources.list $target/etc/apt/sources.list
+! grep -q 'Linux Mint 19' /etc/os-release &&
+	mv $target/etc/apt/sources.list . &&
+	cp /etc/apt/sources.list $target/etc/apt/sources.list
 
 ## Prepare root
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
@@ -591,13 +592,12 @@ cat <<X
 chmod 600 "/boot/initrd.img-$(uname -r)"
 if [[ "$efi_part" ]]
 then
-	mkdir /boot/grub/efi
+	mkdir -p /boot/grub/efi/EFI/boot
 	mount "$efi_part" /boot/grub/efi
 	DEBIAN_FRONTEND=noninteractive apt install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
 	grub-install --force --recheck --efi-directory=/boot/grub/efi "$grub_device"
 	grep -q '^Linux Mint 17' /etc/issue && sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
 	update-grub
-	mkdir /boot/grub/efi/EFI/boot
 	cp /boot/grub/efi/EFI/*/grubx64.efi /boot/grub/efi/EFI/boot/bootx64.efi
 	umount /boot/grub/efi
 	umount /media/cdrom
