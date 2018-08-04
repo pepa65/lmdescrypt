@@ -1,19 +1,19 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.987
+version=0.988
 
 ############################################################################
 #
-#  lmdescrypt 0.987
+#  lmdescrypt 0.988
 #
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
-# This script installs Linux Mint Debian Edition (201403) or LMDE2 (201503 or
-#  201701), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, or 19,
+# This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 or
+#  201701), LMDE3, or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, or 19,
 #  either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
-# The result: a fully LUKS encrypted system, with LVM2 volumes of root and swap
-#  (and optionally: data) with optional boot partition
+# The result: a fully LUKS encrypted system, with LVM2 volumes of root and
+#  swap (and optionally: data) with optional boot partition
 #  (with optional boot-from-iso-file).
 #
 # Shortlink to download the script: http://4e4.win/lmdescrypt
@@ -543,6 +543,7 @@ mount -t proc proc /proc
 mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
+type -p localectl >/dev/null && localectl set-locale LANG=$LANG
 useradd -ms /bin/bash $username
 pwf=\$(mktemp) pwf2=\$(mktemp)
 chmod 600 "\$pwf" "\$pwf2"
