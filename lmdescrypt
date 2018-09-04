@@ -589,11 +589,11 @@ then
 	echo 'rm -rvf /lib/live'
 	echo "update-initramfs -c -k $(uname -r)"
 fi
+efi_dir=/boot/efi
 cat <<X
 chmod 600 "/boot/initrd.img-$(uname -r)"
 if [[ "$efi_part" ]]
 then
-	efi_dir=/boot/efi
 	mount "$efi_part" "$efi_dir"
 	mkdir -p "$efi_dir/EFI/boot"
 	DEBIAN_FRONTEND=noninteractive apt install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
