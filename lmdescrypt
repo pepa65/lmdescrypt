@@ -597,7 +597,7 @@ then
 	mount "$efi_part" "$efi_dir"
 	mkdir -p "$efi_dir/EFI/boot"
 	DEBIAN_FRONTEND=noninteractive apt install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
-	grub-install --force --recheck --efi-directory="$efi_dir" "$grub_device"
+	grub-install -v --force --recheck --target=x86_64-efi --efi-directory="$efi_dir" "$grub_device"
 	grep -q '^Linux Mint 17' /etc/issue && sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
 	update-grub
 	cp "$efi_dir"/EFI/*/grubx64.efi "$efi_dir/EFI/boot/bootx64.efi"
