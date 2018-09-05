@@ -460,7 +460,7 @@ aptsrc="/etc/apt/sources.list"
 rm "$target/$aptsrc"
 osrelease=$(</etc/os-release)
 grep -q '^ID=ubuntu' <<<"$osrelease" && apt-add-repository universe
-! grep -q 'Linux Mint 19' <<<"$osrelease" && cp $aptsrc $target/$aptsrc
+! grep -q 'Linux Mint 19' <<<"$osrelease" && cp "$aptsrc" "$target/$aptsrc"
 
 ## Prepare root
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
@@ -577,7 +577,7 @@ then
 	mkdir /media/cdrom
 	mount /dev/sr0 /media/cdrom
 	apt-cdrom -m add -d=/media/cdrom
-	sed -i 's/^deb /deb [arch=amd64] /g' $aptsrc
+	sed -i 's/^deb /deb [arch=amd64] /g' "\$aptsrc"
 fi
 if [[ "$packages" ]]
 then
@@ -589,11 +589,11 @@ if ((lmde))
 then
 	echo "apt-get -qq purge '^live-.*'"
 	echo 'rm -rvf /lib/live'
+	echo 'update-initramfs -c -k $(uname -r)'
 fi
 efi_dir=/boot/efi
 cat <<X
-update-initramfs -c -k $(uname -r)
-chmod 600 "/boot/initrd.img-$(uname -r)"
+chmod 600 "/boot/initrd.img-*"
 if [[ "$efi_part" ]]
 then
 	mkdir -p "$efi_dir"
@@ -608,10 +608,10 @@ then
 	umount /media/cdrom
 	rmdir /media/cdrom
 else
-	update-grub
 	grub-install --force --recheck "$grub_device"
+	update-grub
 fi
-sed -i 's/^deb.* cdrom:.*/#\0/' $aptsrc
+sed -i 's/^deb.* cdrom:.*/#\0/' "\$aptsrc"
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
