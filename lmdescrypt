@@ -577,7 +577,7 @@ then
 	mkdir /media/cdrom
 	mount /dev/sr0 /media/cdrom
 	apt-cdrom -m add -d=/media/cdrom
-	sed -i 's/^deb /deb [arch=amd64] /g' "\$aptsrc"
+	sed -i 's/^deb /deb [arch=amd64] /g' "$aptsrc"
 fi
 if [[ "$packages" ]]
 then
@@ -593,7 +593,7 @@ then
 fi
 efi_dir=/boot/efi
 cat <<X
-chmod 600 "/boot/initrd.img-*"
+chmod 600 "/boot/initrd.img-\$(uname -r)"
 if [[ "$efi_part" ]]
 then
 	mkdir -p "$efi_dir"
@@ -611,7 +611,7 @@ else
 	grub-install --force --recheck "$grub_device"
 	update-grub
 fi
-sed -i 's/^deb.* cdrom:.*/#\0/' "\$aptsrc"
+sed -i 's/^deb.* cdrom:.*/#\0/' "$aptsrc"
 gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
