@@ -616,8 +616,7 @@ else
 	update-grub
 fi
 [[ -f $aptsrc ]] && sed -i 's/^deb.* cdrom:.*/#\0/' "$aptsrc"
-grep -q '^ID=ubuntu' <<<"$osrelease"  ||
-	gconftool-2 --set /apps/gksu/sudo-mode --type bool true
+gconftool-2 --set /apps/gksu/sudo-mode --type bool true 2>/dev/null
 umount /dev/pts
 umount /proc
 umount /sys
