@@ -10,8 +10,9 @@ version=0.989
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 or
-#  201701), LMDE3, or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, or 19,
-#  either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
+#  201701), LMDE3 (201808), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3,
+#  19, or Ubuntu 18.04, either i686 or amd64, with MSDOS or GPT partitions,
+#  with UEFI or not.
 # The result: a fully LUKS encrypted system, with LVM2 volumes of root and
 #  swap (and optionally: data) with optional boot partition
 #  (with optional boot-from-iso-file).
@@ -615,7 +616,8 @@ else
 	update-grub
 fi
 [[ -f $aptsrc ]] && sed -i 's/^deb.* cdrom:.*/#\0/' "$aptsrc"
-gconftool-2 --set /apps/gksu/sudo-mode --type bool true
+grep -q '^ID=ubuntu' <<<"$osrelease"  ||
+	gconftool-2 --set /apps/gksu/sudo-mode --type bool true
 umount /dev/pts
 umount /proc
 umount /sys
