@@ -1,5 +1,5 @@
 # lmdescrypt
-### version 0.989
+### version 0.990
 
 This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 and
 201701), LMDE3, or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, or 19,
