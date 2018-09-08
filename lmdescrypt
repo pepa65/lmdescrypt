@@ -1,7 +1,6 @@
 #!/bin/bash
-set +o xtrace +o verbose -o errexit -o errtrace
+set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o errexit; return 1' ERR
-trap 'echo Exit' EXIT
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 2' INT TERM
 version=0.990
 
@@ -223,8 +222,8 @@ Checklabel(){ ## $1: labelname
 	label="$1_label"
 	content=$(eval "echo \$$label")
 	[[ $content ]] || eval "$label=$1"
-	[[ ! $content = ${content/ } ]] \
-			&& Exit "Label $label contains spaces: '$content'"
+	[[ ! $content = ${content/ } ]] &&
+		Exit "Label $label contains spaces: '$content'"
 }
 
 ############################################################################
