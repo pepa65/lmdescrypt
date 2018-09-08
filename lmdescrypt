@@ -250,7 +250,7 @@ do
 	! eval "$q" && Exit "Failed argument evaluation: '$p'" && return 7
 	echo "    ${q%%=*}: ${q#*=}"
 done
-sleep 9999
+
 ## Check existence of mandatory devices
 [[ ! -w "$crypt_part" ]] &&
 	Exit "Crypt device does not exist or is not writable: '$crypt_part'" &&
