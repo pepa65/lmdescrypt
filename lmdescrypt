@@ -2,20 +2,20 @@
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o errexit; return 1' ERR
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 2' INT TERM
-version=0.990
+version=0.991
 
 ############################################################################
 #
-#  lmdescrypt 0.990
+#  lmdescrypt 0.991
 #
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 or
 #  201701), LMDE3 (201808), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3,
 #  19, or Ubuntu 18.04, either i686 or amd64, with MSDOS or GPT partitions,
-#  with UEFI or not.
-# The result: a fully LUKS encrypted system, with LVM2 volumes of root and
-#  swap (and optionally: data) with optional boot partition
+#  with UEFI or not, with LUKS encryption or not, with ZFS or LVM2.
+# The result: a fully LUKS encrypted system (or not), with LVM2 or ZFS volumes
+#   of root and swap (and optionally: data) with optional boot partition
 #  (with optional boot-from-iso-file).
 #
 # Shortlink to download the script: http://4e4.win/lmdescrypt
@@ -36,32 +36,20 @@ version=0.990
 #### INSTRUCTIONS
 ############################################################################
 ##
-### 1. Boot the Live environment
+### 1. Boot the ISO as a Live environment
 ##
 ### 2. Open a Terminal (Menu/Terminal of Ctrl-Alt-T) and enter:
 ##> sudo -i
 ##> wget 4e4.win/lmdescrypt
 ##
-### 3. If needed, adapt the SETTINGS section:
+### 3. Review and adapt the SETTINGS section:
 ##> nano lmdescrypt
 ##
-### 4. Make sure all the partitions mentioned in SETTINGS exist
-## For example, (re)partition the drive like this for non-UEFI
-##  (erasing all, taking up all space):
-##
-##> sgdisk -Zon1::+2M -t1:ef02 -c1:BIOS -n 2::-0 -t2:8e00 -c2:X -g /dev/sda
-##
-## For a UEFI setup instead, this example works:
-##
-##> sgdisk -Zon1::+260M -t1:ef00 -c1:EFI -n2::-0 -t2:8e00 -c2:X -g /dev/sda
-##
-##  (This is giving almost the whole drive to the encrypted lvm2)
-##
-### 5. Start the script:
+### 4. Start the script:
 ##
 ##> source lmdescrypt
 ##
-### 6. Answer the questions as they come up:
+### 5. Answer the questions as they come up:
 ##  - set password for encryption
 ##  Then after a wait for all the preparations to have happened:
 ##  - set password for user
@@ -71,7 +59,7 @@ version=0.990
 ### And that's it!
 ##
 ### Installing into a pre-existing environment
-##  Using a pre-existing boot-partition, LUKS partition and LVM Logical
+##  Using a pre-existing boot-partition, LUKS partition, LVM or ZFS Logical
 ##   Volumes is entirely supported.
 ##  Not having a separate boot partition is also supported: total encryption!
 ##  Multiple boot setups with other OSes also works out of the box.
@@ -83,6 +71,18 @@ version=0.990
 #### SETTINGS
 ############################################################################
 ## Review all settings in this section
+
+## When autopart is empty, partitions will need to be set up beforehand.
+## When autopart is set, the former partition layout will be WIPED OUT!
+##   Syntax: <device>:gpt|dos,<partition>[,...]
+##           <partition>: efi|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
+##   Max. 1 efi, 1 boot, 1 of luks/lvm/zfs ('none' as many as needed)
+### Partitioning scheme
+autopart=/dev/sda:dos,bios:2M,luks:rest
+autopart=/dev/sda:gpt,efi:220M,boot:600M,zfs:rest
+autopart=/dev/sda:gpt,efi:220M,luks:rest
+autopart=/dev/sda:gpt,efi:20M,boot:500M,luks:rest
+## (Only the last one takes effect!)
 
 ### The device to be booted (for the grub bootloader: usually a drive!):
 grub_device=/dev/sda
@@ -96,7 +96,8 @@ grub_device=/dev/sda
 ## GPT non-UEFI setup: Must have a bios partition (type ef02) of at least 2M!
 ### Partitions to use:
 boot_part=
-crypt_part=/dev/sda2
+vg_part=/dev/sda2
+## Both are IGNORED/OVERWRITTEN when autopart is set!
 
 ## When boot_part is not set, this is ignored
 ## If the boot partition is too small, the install will fail in the end!
@@ -114,7 +115,7 @@ insecure_keyfile=0
 ## Set to 1 only if you already have a LUKS encrypted partition that you want
 ##  to wipe and start from scratch. If set to 0 and there are pre-existing
 ##  volumes that you want to erase, you can do it manually:
-##>  cryptsetup luksOpen <crypt_part> <crypt_label>
+##>  cryptsetup luksOpen <vg_part> <crypt_label>
 ##>  lvremove /dev/<vg_label>/<volumelabel>
 ### Wipe out the crypt-partition before setup, even if already set up, if 1:
 force_reencrypt=0
@@ -130,14 +131,15 @@ force_random=0
 ## If empty, the default NAME (as in NAME_label) will be used.
 ### Filesystem labels (no spaces):
 boot_label=
-vg_label=
-crypt_label=
 root_label=
 swap_label=
 data_label=
+vg_label=
+crypt_label=
+## crypt_label is only used with LUKS, vg_label either with ZFS or LVM2.
 
 ## Don't allot more space than available, and at least 6GB for root.
-## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal
+## Specify volume sizes in gigabytes (G) or megabytes (M), no decimal
 ##  points or spaces, like: 10G or 200M
 ## - if empty (only for swap or data) it will NOT BE USED
 ## - if EXISTING it will NOT be created, and then the Logical Volume needs
@@ -154,14 +156,15 @@ data_size=
 ## Adjust if re-using preexisting boot or data volumes!
 ## Fill in the desired filesystem-type, empty means it will NOT BE FORMATTED!
 ##  (Pre-existing filesystem will be kept!)
-## Supported for boot and root: btrfs ext2 ext3 ext4 reiserfs xfs.
-## For swap: swap. For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs minix msdos
-##  ntfs reiserfs vfat xfs
+## Supported for boot & root: btrfs ext2 ext3 ext4 reiserfs xfs zfs.
+## Supported for swap: swap.  For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs
+##  minix msdos ntfs reiserfs vfat xfs zfs.
 ### Filesystems:
 boot_fs=ext4
 root_fs=btrfs
 swap_fs=swap
 data_fs=
+## If zfs is used anywhere here, the volume group will be zfs (luks or not)
 
 ## Adjust if you require another encryption scheme, see /proc/crypto.
 ## Find the speeds on your hardware (and choose accordingly) by:
@@ -250,9 +253,48 @@ do
 	echo "    ${q%%=*}: ${q#*=}"
 done
 
+## Auto-partition
+if [[ $autopart ]]
+then
+	dostype=([efi]=ef [bios]= [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
+	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0)
+	gptlabel=(efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
+	IFS=':,' read device scheme parts <<<"$autopart"
+	! [[ $scheme = dos || $scheme = gpt ]] &&
+		Exit "Auto-partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
+		return
+	fdiskcmd="o\n" sgdiskcmd="-Zo" vg= size= n=1
+	while [[ $parts ]]
+	do
+		[[ $size = rest ]] &&
+			Exit "In auto-partitioning, size 'rest' must be the last partition" &&
+			return
+		IFS=':,' read part size parts <<<"$parts"
+		[[ -z ${dostype[part]} ]] &&
+			Exit "Unknown partition type for auto-partitioning: $part" && return
+		if [[ $part = luks || $part = lvm || $part = zfs ]]
+		then
+			[[ $vg ]] &&
+				Exit "More than 1 of luks/lvm/zfs in auto-partitioning: $vg $part" &&
+				return
+			vg=$part
+		fi
+		! [[ $size = rest || $size =~ ^[1-9][0-9]*$ ]] &&
+			Exit "Bad size '$size' in auto-partitioning" && return
+		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=$size
+		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[part]}\n"
+		sgdiskcmd+=" -n$n::$gptsize -t$n"${gpttype[part]} -c$((n++)):${gptlabel[part]}"
+	done
+	fdiskcmd+="w\n"
+	sgdisk -b sgdisk.backup "$device"
+	Echo "Auto-partitioning... Restore old scheme by:\n  sgdisk -l sgdisk.backup"
+	[[ $scheme = dos ]] && echo -e "$fdiskcmd" |fdisk "$device" ||
+		sgdisk "$sgdiskcmd" "$device"
+fi
+
 ## Check existence of mandatory devices
-[[ ! -w "$crypt_part" ]] &&
-	Exit "Crypt device does not exist or is not writable: '$crypt_part'" &&
+[[ ! -w "$vg_part" ]] &&
+	Exit "Volume group device does not exist or is not writable: '$vg_part'" &&
 	return 8
 [[ ! -w "$grub_device" ]] &&
 	Exit "Grub device does not exist or is not writable: '$grub_device'" &&
@@ -344,29 +386,29 @@ done
 
 if ((force_reencrypt))
 then
-	((force_random)) && badblocks -c 10240 -s -w -t random -v "$crypt_part"
-	cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwf"
+	((force_random)) && badblocks -c 10240 -s -w -t random -v "$vg_part"
+	cryptsetup luksFormat $cryptopts "$vg_part" --key-file "$pwf"
 else
-	cryptsetup isLuks "$crypt_part" &&
-		Warning "$crypt_part is already formatted, reencryption not forced" ||
-		cryptsetup luksFormat $cryptopts "$crypt_part" --key-file "$pwf"
+	cryptsetup isLuks "$vg_part" &&
+		Warning "$vg_part is already formatted, reencryption not forced" ||
+		cryptsetup luksFormat $cryptopts "$vg_part" --key-file "$pwf"
 fi
 
 if [[ -z $boot_part ]] && ((insecure_keyfile))
 then
 	key=crypto_keyfile.bin
 	dd bs=512 count=4 if=/dev/urandom of="/root/$key"
-	cryptsetup luksAddKey "$crypt_part" "/root/$key" --key-file "$pwf"
+	cryptsetup luksAddKey "$vg_part" "/root/$key" --key-file "$pwf"
 fi
 
 ## Decrypt if not yet mapped
 crypt_dev="/dev/mapper/$crypt_label"
 [[ ! -b "$crypt_dev" ]] &&
-	! cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" &&
+	! cryptsetup luksOpen "$vg_part" $crypt_label --key-file "$pwf" &&
 	shred -u "$pwf" &&
-		Exit "Failed to open the encrypted partition $crypt_part" && return 25
+		Exit "Failed to open the encrypted partition $vg_part" && return 25
 shred -u "$pwf"
-crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
+crypt_uuid=$(blkid -s UUID -o value "$vg_part")
 
 ## Make lvm2 volumes if not there yet and make filesystems if wanted
 vgchange -ay
@@ -507,7 +549,7 @@ then
 		p4="luks,keyscript=/bin/cat"
 	fi
 	sed -i '/^GRUB_TIMEOUT/a GRUB_ENABLE_CRYPTODISK=y' "$target/etc/default/grub"
-	gcl="GRUB_CMDLINE_LINUX=\"cryptdevice=$crypt_part:$crypt_label\""
+	gcl="GRUB_CMDLINE_LINUX=\"cryptdevice=$vg_part:$crypt_label\""
 	sed -i "s@^GRUB_CMDLINE_LINUX=\"\"@$gcl@" "$target/etc/default/grub"
 	sed -i 's@ splash"$@"@' "$target/etc/default/grub"
 else
@@ -549,7 +591,7 @@ ldm=/etc/lightdm/lightdm.conf
 sed "s/mint/$username/g" "$dm" >"$target$dm"
 rm -- "$target/etc/resolv.conf"  ## remove symlink
 cp /etc/resolv.conf "$target/etc"
-cryptsetup luksHeaderBackup --header-backup-file "$target/root/$crypt_label.luksHeaderBackup" "$crypt_part"
+cryptsetup luksHeaderBackup --header-backup-file "$target/root/$crypt_label.luksHeaderBackup" "$vg_part"
 chmod 400 "$target/root/$crypt_label.luksHeaderBackup"
 cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
 ((lmde)) &&
