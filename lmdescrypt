@@ -119,6 +119,7 @@ insecure_keyfile=0
 ##>  lvremove /dev/<vg_label>/<volumelabel>
 ### Wipe out the crypt-partition before setup, even if already set up, if 1:
 force_reencrypt=0
+## If autopart is set, this is automatically set to 1 (always re-encrypt)
 
 ## No strict need to adjust, unless paranoid. WARNING: Putting 1 here will
 ##  take a LONG time (depending on partition size) - let it run overnight!
@@ -256,40 +257,49 @@ done
 ## Auto-partition
 if [[ $autopart ]]
 then
+	Echo "Autopartitioning!"
 	dostype=([efi]=ef [bios]= [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
 	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0)
 	gptlabel=(efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
 	IFS=':,' read device scheme parts <<<"$autopart"
 	! [[ $scheme = dos || $scheme = gpt ]] &&
-		Exit "Auto-partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
+		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return
-	fdiskcmd="o\n" sgdiskcmd="-Zo" vg= size= n=1
+	fdiskcmd="o\n" sgdiskcmd="-Zo" vg= size= n=1 boot_part= vg_part= efi_part=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
-			Exit "In auto-partitioning, size 'rest' must be the last partition" &&
+			Exit "Size 'rest' can only be used for the last partition" &&
 			return
 		IFS=':,' read part size parts <<<"$parts"
 		[[ -z ${dostype[part]} ]] &&
-			Exit "Unknown partition type for auto-partitioning: $part" && return
+			Exit "Unknown partition type: $part" && return
 		if [[ $part = luks || $part = lvm || $part = zfs ]]
 		then
-			[[ $vg ]] &&
-				Exit "More than 1 of luks/lvm/zfs in auto-partitioning: $vg $part" &&
+			[[ $vg_part ]] &&
+				Exit "More than 1 partition of type luks/lvm/zfs: $vg_part $part" &&
 				return
-			vg=$part
+			vg_part=$part
 		fi
+		[[ $boot_part && $part = boot ]] &&
+			Exit "Only 1 boot partition allowed" && return ||
+			boot_part=$part
+		[[ $efi_part && $part = efi ]] &&
+			Exit "Only 1 EFI partition allowed" && return ||
+			efi_part=$part
 		! [[ $size = rest || $size =~ ^[1-9][0-9]*$ ]] &&
 			Exit "Bad size '$size' in auto-partitioning" && return
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[part]}\n"
-		sgdiskcmd+=" -n$n::$gptsize -t$n"${gpttype[part]} -c$((n++)):${gptlabel[part]}"
+		sgdiskcmd+=" -n$n::$gptsize -t$n"${gpttype[part]} -c$n:${gptlabel[part]}"
+		((n++))
 	done
 	fdiskcmd+="w\n"
 	sgdisk -b sgdisk.backup "$device"
-	Echo "Auto-partitioning... Restore old scheme by:\n  sgdisk -l sgdisk.backup"
+	Echo "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
 	[[ $scheme = dos ]] && echo -e "$fdiskcmd" |fdisk "$device" ||
 		sgdisk "$sgdiskcmd" "$device"
+	force_reencrypt=1
 fi
 
 ## Check existence of mandatory devices
