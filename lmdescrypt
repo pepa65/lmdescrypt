@@ -286,7 +286,7 @@ then
 			Exit "Size 'rest' can only be used for the last partition" &&
 			return
 		IFS=':,' read part size parts <<<"$parts"
-		[[ -z ${dostype[part]} ]] &&
+		[[ -z ${gpttype[$part]} ]] &&
 			Exit "Unknown partition type: $part" && return
 		if [[ $part = luks || $part = lvm || $part = zfs ]]
 		then
@@ -309,8 +309,8 @@ then
 		! [[ $size = rest || $size =~ ^[1-9][0-9]*[MGPT]$ ]] &&
 			Exit "Bad size '$size' in auto-partitioning" && return
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=$size
-		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[part]}\n"
-		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[part]} -c$n:${gptlabel[part]}"
+		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[$part]}\n"
+		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:${gptlabel[$part]}"
 		((n++))
 	done
 	fdiskcmd+="w\n"
