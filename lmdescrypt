@@ -248,70 +248,79 @@ self=$(basename $BASH_SOURCE)
 for p in "$@"
 do
 	[[ ! $p =~ ^[a-z_][a-z0-9_]*= ]] &&
-		Exit "No variable assignment: $p" && return 6
+		Exit "No variable assignment: $p" &&
+		return 6
 	q="${p/=/=\'}'"
-	! eval "$q" && Exit "Failed argument evaluation: '$p'" && return 7
+	! eval "$q" && Exit "Failed argument evaluation: '$p'" &&
+		return 7
 	echo "    ${q%%=*}: ${q#*=}"
 done
 
 ## Check names, labels, root_fs
 [[ ! $username =~ ^[a-z_][a-z0-9_]*$ ]] &&
-	Exit "Illegal format for username: '$username'" && return 10
+	Exit "Illegal format for username: '$username'" &&
+	return 8
 [[ ! $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] &&
-	Exit "Illegal format for hostname: '$hostname'" && return 11
-Checklabel crypt && return 12
-Checklabel vg && return 13
-Checklabel boot && return 14
-Checklabel root && return 15
-Checklabel swap && return 16
-Checklabel data && return 17
+	Exit "Illegal format for hostname: '$hostname'" &&
+	return 9
+Checklabel crypt && return 10
+Checklabel vg && return 11
+Checklabel boot && return 12
+Checklabel root && return 13
+Checklabel swap && return 14
+Checklabel data && return 15
 [[ ! $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
-	Exit "Wrong value for root_fs: '$root_fs'" && return 18
+	Exit "Wrong value for root_fs: '$root_fs'" &&
+	return 16
 
 ## Auto-partition
 if [[ $autopart ]]
 then
 	declare -A dostype gpttype gptlabel
 	dostype=([efi]=ef [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
-	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=CA7D7CCB-63ED-4C53-861C-1742536059CC [lvm]=8e00 [zfs]=8300 [none]=8301)
+	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0700)
 	gptlabel=([efi]="'EFI System'" [bios]="'BIOS boot partition'" [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
 	IFS=':,' read device scheme parts <<<"$autopart"
 	! [[ $scheme = dos || $scheme = gpt ]] &&
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
-		return
+		return 17
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
 	fdiskcmd="o\n" sgdiskcmd="-Zo" size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
 			Exit "Size 'rest' can only be used for the last partition" &&
-			return
+			return 18
 		IFS=':,' read part size parts <<<"$parts"
 		[[ -z ${gpttype[$part]} ]] &&
-			Exit "Unknown partition type: $part" && return
+			Exit "Unknown partition type: $part" &&
+			return 19
 		if [[ $part = luks || $part = lvm || $part = zfs ]]
 		then
-			[[ $vg_part ]] &&
-				Exit "More than 1 partition of type luks/lvm/zfs" &&
-				return
+			[[ $vg_part ]] && Exit "More than 1 partition of type luks/lvm/zfs" &&
+				return 20
 			vg_part=$device$n
 		fi
 		if [[ $part = boot ]]
 		then
 			[[ $boot_part ]] &&
-				Exit "Only 1 boot partition allowed" && return
+				Exit "Only 1 boot partition allowed" &&
+				return 21
 			boot_part=$part
 		fi
-		[[ $efi && $part = efi ]] &&
-			Exit "Only 1 EFI partition allowed" && return ||
+		[[ $efi && $part = efi ]] && Exit "Only 1 EFI partition allowed" &&
+			return 22 ||
 			efi=$part
 		[[ $part = bios && $scheme = dos ]] &&
-			Exit "No BIOS partition on DOS partition scheme allowed" && return
+			Exit "No BIOS partition on DOS partition scheme allowed" &&
+			return 23
 		[[ $bios && $part = bios ]] &&
-			Exit "Only 1 BIOS partition allowed" && return ||
+			Exit "Only 1 BIOS partition allowed" &&
+			return 24 ||
 			bios=$part
 		! [[ $size = rest || $size =~ ^[1-9][0-9]*[MGPT]$ ]] &&
-			Exit "Bad size '$size' in auto-partitioning" && return
+			Exit "Bad size '$size' in auto-partitioning" &&
+			return 25
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=+$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[$part]}\n"
 		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:${gptlabel[$part]}"
@@ -322,33 +331,44 @@ then
 	sgdisk -b sgdisk.bck "$device"
 	mv -n sgdisk.bck sgdisk.backup
 	echo -e "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
-	[[ $scheme = gpt ]] && sgdisk "$sgdiskcmd" "$device" ||
-		echo -e "$fdiskcmd" |fdisk "$device"
+	if [[ $scheme = gpt ]]
+	then
+		! sgdisk "$sgdiskcmd" "$device" &&
+			Exit "Error $? partitioning after:\nsgdisk $sgdiskcmd $device" &&
+			return 26
+	else
+		! echo -e "$fdiskcmd" |fdisk "$device" &&
+			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $device" &&
+			return 27
+	fi
 	force_reencrypt=1
 fi
 
 ## Check existence of mandatory devices
 [[ ! -w "$vg_part" ]] &&
 	Exit "Volume group device does not exist or is not writable: '$vg_part'" &&
-	return 8
+	return 28
 [[ ! -w "$grub_device" ]] &&
 	Exit "Grub device does not exist or is not writable: '$grub_device'" &&
-	return 9
+	return 29
 
 ## Determine root and data partition usage & size
 [[ $root_size ]] && [[ ! $root_size = REST ]] &&
 	[[ ! $root_size = EXISTING ]] && [[ ! $root_size =~ [1-9][0-9]*[MG] ]] &&
-	Exit "Invalid format root_size: '$root_size'" && return 19
+	Exit "Invalid format root_size: '$root_size'" &&
+		return 30
 if [[ $data_size = REST ]]
 then
 	[[ $root_size = REST ]] &&
-		Exit "Settings data_size and root_size can't both be REST" && return 20
+		Exit "Settings data_size and root_size can't both be REST" &&
+		return 31
 	lvm_data='-l 100%FREE -Zy'
 else
 	if [[ $data_size && ! $data_size = EXISTING ]]
 	then
 		[[ ! $data_size =~ [1-9][0-9]*[MG] ]] &&
-			Exit "Invalid format data_size: '$data_size'" && return 21
+			Exit "Invalid format data_size: '$data_size'" &&
+			return 32
 		lvm_data="-L $data_size -Zy"
 	fi
 fi
@@ -361,7 +381,8 @@ else
 	if [[ ! $swap_size = EXISTING ]]
 	then
 		[[ $swap_size ]] && [[ ! $swap_size =~ [1-9][0-9]*[MG] ]] &&
-			Exit "Invalid format swap_size: $swap_size" && return 22
+			Exit "Invalid format swap_size: $swap_size" &&
+			return 33
 		lvm_swap="-L $swap_size -Cy -Zy"
 	fi
 fi
@@ -374,13 +395,15 @@ then  ## GPT partition scheme
 	if [[ -e /sys/firmware/efi ]]
 	then  ## UEFI: so it is an amd64 architecture that supports UEFI
 		read n discard <<<"$(grep ' EF00  ' <<<"$gdisk" |head -1)"
-		[[ -z $n ]] && Exit "UEFI without type ef00 efi partition!" && return 23
+		[[ -z $n ]] && Exit "UEFI without type ef00 efi partition!" &&
+			return 34
 		efi_part="$grub_device$n"
 		[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
 			mkfs.vfat -n EFI "$efi_part"
 	else  ## non-UEFI GPT setup
 		! grep -q ' EF02  ' <<<"$gdisk" &&
-			Exit "Non-UEFI GPT setup without type ef02 bios partition" && return 24
+			Exit "Non-UEFI GPT setup without type ef02 bios partition" &&
+			return 35
 	fi
 fi
 
@@ -427,7 +450,8 @@ crypt_dev="/dev/mapper/$crypt_label"
 [[ ! -b "$crypt_dev" ]] &&
 	! cryptsetup luksOpen "$vg_part" $crypt_label --key-file "$pwf" &&
 	shred -u "$pwf" &&
-		Exit "Failed to open the encrypted partition $vg_part" && return 25
+		Exit "Failed to open the encrypted partition $vg_part" &&
+		return 36
 shred -u "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$vg_part")
 
@@ -447,7 +471,7 @@ then
 	if [[ $swap_fs ]]
 	then
 		[[ ! $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" &&
-			return 26 ||
+			return 37 ||
 			mkswap -f -L $swap_label "$swap_dev"
 	fi
 fi
@@ -458,22 +482,23 @@ fi
 if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
 	[[ ! -h $data_dev && $data_size = EXISTING ]] &&
-		Exit "There is no existing data device $data_dev" && return 27
-		lvcreate -Wy $lvm_data -n $data_label $vg_label
+		Exit "There is no existing data device $data_dev" &&
+		return 38
+	lvcreate -Wy $lvm_data -n $data_label $vg_label
 	if [[ $data_fs ]]
 	then
 		! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
 			Exit "Unsupported filesystem $data_fs for data volume $data_dev with label $data_label" &&
-			return 28
+			return 39
 	else  ## No data filesystem specified: existing or bust
 		if [[ $data_size = EXISTING ]]
 		then
 			! data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null) &&
 				Exit "No filesystem specified for data volumeand none present" &&
-				return 29
+				return 40
 		else
 			Exit "No filesystem specified for data volume"
-			return 30
+			return 41
 		fi
 	fi
 fi
@@ -483,30 +508,32 @@ if [[ $root_fs ]]
 then
 	! Mkfs "$root_fs" "$root_label" "$root_dev" root &&
 		Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" &&
-		return 31
+		return 42
 else
 	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
 	[[ -z $root_fs ]] &&
 		Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
-		return 32
+		return 43
 	[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|zfs|)$ ]] &&
-		Exit "Root partition has unsupported filesystem: $root_fs" && return 33
+		Exit "Root partition has unsupported filesystem: $root_fs" &&
+		return 44
 fi
 
 if [[ $boot_part ]]
 then
 	[[ ! $boot_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|zfs|)$ ]] &&
-		Exit "Wrong value for boot_fs: '$boot_fs'" && return 34
+		Exit "Wrong value for boot_fs: '$boot_fs'" &&
+		return 45
 	if [[ $boot_fs ]]
 	then
 		! Mkfs "$boot_fs" "$boot_label" "$boot_part" boot &&
 			Exit "Unsupported filesystem $boot_fs for boot-device $boot_part with label $boot_label" &&
-			return 35
+			return 46
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		[[ -z $boot_fs ]] &&
 			Exit "Boot partition $boot_part has no filesystem, fill in 'boot_fs' (or leave boot_part empty)" &&
-			return 36
+			return 47
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
@@ -719,9 +746,11 @@ Echo "Finalizing settings on the install"
 chroot "$target" "$inside"
 
 [[ $(df --output=pcent $target |tail -1) = 100% ]] &&
-	Exit "The filesystem on $root_dev is 100% full" && return 37
+	Exit "The filesystem on $root_dev is 100% full" &&
+	return 48
 [[ $boot_part && $(df --output=pcent $target/boot |tail -1) = 100% ]] &&
-	Exit "The filesystem on $boot_part is 100% full" && return 38
+	Exit "The filesystem on $boot_part is 100% full" &&
+	return 49
 
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
@@ -730,12 +759,13 @@ umount "$target"
 [[ $swap_size ]] && swapoff "$swap_dev"
 sync
 sleep 1
-! vgchange -an && Exit "Not able to close all logical volumes" && return 39
+! vgchange -an && Exit "Not able to close all logical volumes" &&
+	return 50
 sync
 sleep 1
 ! cryptsetup luksClose $crypt_label &&
 	Exit "Not able to cleanly close crypt" &&
-	return 40
+	return 51
 sync
 
 Echo "Ready for reboot!"
