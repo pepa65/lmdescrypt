@@ -254,13 +254,27 @@ do
 	echo "    ${q%%=*}: ${q#*=}"
 done
 
+## Check names, labels, root_fs
+[[ ! $username =~ ^[a-z_][a-z0-9_]*$ ]] &&
+	Exit "Illegal format for username: '$username'" && return 10
+[[ ! $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] &&
+	Exit "Illegal format for hostname: '$hostname'" && return 11
+Checklabel crypt && return 12
+Checklabel vg && return 13
+Checklabel boot && return 14
+Checklabel root && return 15
+Checklabel swap && return 16
+Checklabel data && return 17
+[[ ! $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
+	Exit "Wrong value for root_fs: '$root_fs'" && return 18
+
 ## Auto-partition
 if [[ $autopart ]]
 then
-	Echo "Autopartitioning!"
+	Echo "Auto-partitioning!"
 	dostype=([efi]=ef [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
 	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0)
-	gptlabel=(efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
+	gptlabel=([efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
 	IFS=':,' read device scheme parts <<<"$autopart"
 	! [[ $scheme = dos || $scheme = gpt ]] &&
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
@@ -314,20 +328,6 @@ fi
 [[ ! -w "$grub_device" ]] &&
 	Exit "Grub device does not exist or is not writable: '$grub_device'" &&
 	return 9
-
-## Check names, labels, root_fs
-[[ ! $username =~ ^[a-z_][a-z0-9_]*$ ]] &&
-	Exit "Illegal format for username: '$username'" && return 10
-[[ ! $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] &&
-	Exit "Illegal format for hostname: '$hostname'" && return 11
-Checklabel crypt && return 12
-Checklabel vg && return 13
-Checklabel boot && return 14
-Checklabel root && return 15
-Checklabel swap && return 16
-Checklabel data && return 17
-[[ ! $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
-	Exit "Wrong value for root_fs: '$root_fs'" && return 18
 
 ## Determine root and data partition usage & size
 [[ $root_size ]] && [[ ! $root_size = REST ]] &&
