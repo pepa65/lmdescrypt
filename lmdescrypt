@@ -278,7 +278,7 @@ then
 	! [[ $scheme = dos || $scheme = gpt ]] &&
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return
-	echo "Auto-partitioning $device with ${scheme^^} scheme"
+	Echo "Auto-partitioning $device with ${scheme^^} scheme"
 	fdiskcmd="o\n" sgdiskcmd="-Zo" size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
@@ -318,8 +318,9 @@ then
 		((n++))
 	done
 	fdiskcmd+="w\n"
-	sgdisk -b sgdisk.backup "$device"
-	Echo "Restore old partition scheme by:\n    sgdisk -l sgdisk.backup"
+	sgdisk -b sgdisk.bck "$device"
+	mv -n sgdisk.bck sgdisk.backup
+	echo -e "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
 	[[ $scheme = gpt ]] && sgdisk "$sgdiskcmd" "$device" ||
 		echo -e "$fdiskcmd" |fdisk "$device"
 	force_reencrypt=1
