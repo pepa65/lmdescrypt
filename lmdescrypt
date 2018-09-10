@@ -285,7 +285,7 @@ then
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return 17
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
-	fdiskcmd="o\n" sgdiskcmd=("-Zo") size= n=1 boot_part= vg_part= efi= bios=
+	fdiskcmd="echo -e \"o\n" sgdiskcmd=("-Zo") size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
@@ -326,7 +326,8 @@ then
 		echo "$device$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
 		((n++))
 	done
-	fdiskcmd+="w\n"
+	fdiskcmd+="w\n\" |fdisk $device"
+	sgdiskcmd+=("-g" "$device")
 	[[ $scheme = gpt && ! -e /sys/firmware/efi && -z $bios ]] &&
 		Exit "Non-UEFI GPT setups need a BIOS partition!" &&
 		return 26
@@ -335,12 +336,11 @@ then
 	echo -e "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
 	if [[ $scheme = gpt ]]
 	then
-		! sgdisk "${sgdiskcmd[@]}" "$device" &&
-			Exit "Error $? partitioning after:\nsgdisk ${sgdiskcmd[@]} $device" &&
+		! "${sgdiskcmd[@]}" &&
+			Exit "Error $? partitioning after:\n${sgdiskcmd[@]}" &&
 			return 27
 	else
-		! echo -e "$fdiskcmd" |fdisk "$device" &&
-			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $device" &&
+		! "$fdiskcmd" && Exit "Error $? partitioning after:\n$fdiskcmd" &&
 			return 28
 	fi
 	force_reencrypt=1
