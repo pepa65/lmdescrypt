@@ -271,9 +271,10 @@ Checklabel data && return 17
 ## Auto-partition
 if [[ $autopart ]]
 then
+	declare -A dostype gpttype gptlabel
 	dostype=([efi]=ef [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
-	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0)
-	gptlabel=([efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
+	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=CA7D7CCB-63ED-4C53-861C-1742536059CC [lvm]=8e00 [zfs]=8300 [none]=8301)
+	gptlabel=([efi]="'EFI System'" [bios]="'BIOS boot partition'" [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
 	IFS=':,' read device scheme parts <<<"$autopart"
 	! [[ $scheme = dos || $scheme = gpt ]] &&
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
@@ -311,9 +312,9 @@ then
 			bios=$part
 		! [[ $size = rest || $size =~ ^[1-9][0-9]*[MGPT]$ ]] &&
 			Exit "Bad size '$size' in auto-partitioning" && return
-		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=$size
+		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=+$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[$part]}\n"
-		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:'${gptlabel[$part]}'"
+		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:${gptlabel[$part]}"
 		echo "$device$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
 		((n++))
 	done
