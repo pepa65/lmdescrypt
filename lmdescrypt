@@ -74,14 +74,14 @@ version=0.991
 
 ## When autopart is empty, partitions will need to be set up beforehand.
 ## When autopart is set, the former partition layout will be WIPED OUT!
-##   Syntax: <device>:gpt|dos,<partition>[,...]
-##           <partition>: efi|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
+##   Syntax: <device>:gpt|dos,<partition>[,...]  (No bios on gpt!)
+##           <partition>: efi|bios|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
 ##   Max. 1 efi, 1 boot, 1 of luks/lvm/zfs ('none' as many as needed)
 ### Partitioning scheme
-autopart=/dev/sda:dos,bios:2M,luks:rest
-autopart=/dev/sda:gpt,efi:220M,boot:600M,zfs:rest
-autopart=/dev/sda:gpt,efi:220M,luks:rest
+autopart=/dev/sda:dos,bios:1M,luks:rest
 autopart=/dev/sda:gpt,efi:20M,boot:500M,luks:rest
+autopart=/dev/sda:gpt,efi:300M,zfs:rest
+autopart=/dev/sda:gpt,efi:300M,luks:rest
 ## (Only the last one takes effect!)
 
 ### The device to be booted (for the grub bootloader: usually a drive!):
@@ -265,7 +265,7 @@ then
 	! [[ $scheme = dos || $scheme = gpt ]] &&
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return
-	fdiskcmd="o\n" sgdiskcmd="-Zo" vg= size= n=1 boot_part= vg_part= efi_part=
+	fdiskcmd="o\n" sgdiskcmd="-Zo" size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
@@ -277,21 +277,26 @@ then
 		if [[ $part = luks || $part = lvm || $part = zfs ]]
 		then
 			[[ $vg_part ]] &&
-				Exit "More than 1 partition of type luks/lvm/zfs: $vg_part $part" &&
+				Exit "More than 1 partition of type luks/lvm/zfs" &&
 				return
-			vg_part=$part
+			vg_part=$device$n
 		fi
 		[[ $boot_part && $part = boot ]] &&
 			Exit "Only 1 boot partition allowed" && return ||
 			boot_part=$part
-		[[ $efi_part && $part = efi ]] &&
+		[[ $efi && $part = efi ]] &&
 			Exit "Only 1 EFI partition allowed" && return ||
-			efi_part=$part
-		! [[ $size = rest || $size =~ ^[1-9][0-9]*$ ]] &&
+			efi=$part
+		[[ $part = bios && $scheme = gpt ]] &&
+			Exit "No BIOS partition on GPT partition scheme allowed" && return
+		[[ $bios && $part = bios ]] &&
+			Exit "Only 1 BIOS partition allowed" && return ||
+			bios=$part
+		! [[ $size = rest || $size =~ ^[1-9][0-9]*[MGPT]$ ]] &&
 			Exit "Bad size '$size' in auto-partitioning" && return
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[part]}\n"
-		sgdiskcmd+=" -n$n::$gptsize -t$n"${gpttype[part]} -c$n:${gptlabel[part]}"
+		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[part]} -c$n:${gptlabel[part]}"
 		((n++))
 	done
 	fdiskcmd+="w\n"
