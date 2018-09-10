@@ -74,7 +74,7 @@ version=0.991
 
 ## When autopart is empty, partitions will need to be set up beforehand.
 ## When autopart is set, the former partition layout will be WIPED OUT!
-##   Syntax: <device>:gpt|dos,<partition>[,...]  (No bios on gpt!)
+##   Syntax: <device>:gpt|dos,<partition>[,...]  (No BIOS partition on DOS!)
 ##           <partition>: efi|bios|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
 ##   Max. 1 efi, 1 boot, 1 of luks/lvm/zfs ('none' as many as needed)
 ### Partitioning scheme
@@ -258,7 +258,7 @@ done
 if [[ $autopart ]]
 then
 	Echo "Autopartitioning!"
-	dostype=([efi]=ef [bios]= [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
+	dostype=([efi]=ef [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
 	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0)
 	gptlabel=(efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
 	IFS=':,' read device scheme parts <<<"$autopart"
@@ -287,8 +287,8 @@ then
 		[[ $efi && $part = efi ]] &&
 			Exit "Only 1 EFI partition allowed" && return ||
 			efi=$part
-		[[ $part = bios && $scheme = gpt ]] &&
-			Exit "No BIOS partition on GPT partition scheme allowed" && return
+		[[ $part = bios && $scheme = dos ]] &&
+			Exit "No BIOS partition on DOS partition scheme allowed" && return
 		[[ $bios && $part = bios ]] &&
 			Exit "Only 1 BIOS partition allowed" && return ||
 			bios=$part
