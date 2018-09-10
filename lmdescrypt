@@ -285,7 +285,7 @@ then
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return 17
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
-	fdiskcmd="o\n" sgdiskcmd="-Zo" size= n=1 boot_part= vg_part= efi= bios=
+	fdiskcmd="o\n" sgdiskcmd=("-Zo") size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
@@ -295,35 +295,34 @@ then
 		[[ -z ${gpttype[$part]} ]] &&
 			Exit "Unknown partition type: $part" &&
 			return 19
-		if [[ $part = luks || $part = lvm || $part = zfs ]]
-		then
-			[[ $vg_part ]] && Exit "More than 1 partition of type luks/lvm/zfs" &&
+		case $part in
+		luks|lvm|zfs)
+			[[ $vg_part ]] &&
+				Exit "More than 1 partition of type luks/lvm/zfs" &&
 				return 20
-			vg_part=$device$n
-		fi
-		if [[ $part = boot ]]
-		then
-			[[ $boot_part ]] &&
-				Exit "Only 1 boot partition allowed" &&
+			vg_part=$device$n ;;
+		boot)
+			[[ $boot_part ]] && Exit "Only 1 boot partition allowed" &&
 				return 21
-			boot_part=$part
-		fi
-		[[ $efi && $part = efi ]] && Exit "Only 1 EFI partition allowed" &&
-			return 22 ||
-			efi=$part
-		[[ $part = bios && $scheme = dos ]] &&
-			Exit "No BIOS partition on DOS partition scheme allowed" &&
-			return 23
-		[[ $bios && $part = bios ]] &&
-			Exit "Only 1 BIOS partition allowed" &&
-			return 24 ||
-			bios=$part
+			boot_part=$part ;;
+		efi)
+			[[ $efi ]] && Exit "Only 1 EFI partition allowed" &&
+				return 22
+			efi=$part ;;
+		bios)
+			[[ $scheme = dos ]] &&
+				Exit "No BIOS partition on DOS partition scheme allowed" &&
+				return 23
+			[[ $bios ]] && Exit "Only 1 BIOS partition allowed" &&
+				return 24
+			bios=$part ;;
+		esac
 		! [[ $size = rest || $size =~ ^[1-9][0-9]*[MGPT]$ ]] &&
 			Exit "Bad size '$size' in auto-partitioning" &&
 			return 25
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=+$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[$part]}\n"
-		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:${gptlabel[$part]}"
+		sgdiskcmd+=("-n$n::$gptsize" "-t$n:${gpttype[$part]}" "-c$n:${gptlabel[$part]}")
 		echo "$device$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
 		((n++))
 	done
@@ -333,8 +332,8 @@ then
 	echo -e "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
 	if [[ $scheme = gpt ]]
 	then
-		! sgdisk "$sgdiskcmd" "$device" &&
-			Exit "Error $? partitioning after:\nsgdisk $sgdiskcmd $device" &&
+		! sgdisk "${sgdiskcmd[@]}" "$device" &&
+			Exit "Error $? partitioning after:\nsgdisk ${sgdiskcmd[@]} $device" &&
 			return 26
 	else
 		! echo -e "$fdiskcmd" |fdisk "$device" &&
