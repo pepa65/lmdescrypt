@@ -271,7 +271,6 @@ Checklabel data && return 17
 ## Auto-partition
 if [[ $autopart ]]
 then
-	Echo "Auto-partitioning!"
 	dostype=([efi]=ef [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
 	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0)
 	gptlabel=([efi]='EFI System' [bios]='BIOS boot partition' [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
@@ -279,6 +278,7 @@ then
 	! [[ $scheme = dos || $scheme = gpt ]] &&
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return
+	echo "Auto-partitioning $device with ${scheme^^} scheme"
 	fdiskcmd="o\n" sgdiskcmd="-Zo" size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
@@ -295,9 +295,12 @@ then
 				return
 			vg_part=$device$n
 		fi
-		[[ $boot_part && $part = boot ]] &&
-			Exit "Only 1 boot partition allowed" && return ||
+		if [[ $part = boot ]]
+		then
+			[[ $boot_part ]] &&
+				Exit "Only 1 boot partition allowed" && return
 			boot_part=$part
+		fi
 		[[ $efi && $part = efi ]] &&
 			Exit "Only 1 EFI partition allowed" && return ||
 			efi=$part
@@ -310,14 +313,15 @@ then
 			Exit "Bad size '$size' in auto-partitioning" && return
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[$part]}\n"
-		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:${gptlabel[$part]}"
+		sgdiskcmd+=" -n$n::$gptsize -t$n:${gpttype[$part]} -c$n:'${gptlabel[$part]}'"
+		echo "$device$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
 		((n++))
 	done
 	fdiskcmd+="w\n"
 	sgdisk -b sgdisk.backup "$device"
-	Echo "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
-	[[ $scheme = dos ]] && echo -e "$fdiskcmd" |fdisk "$device" ||
-		sgdisk "$sgdiskcmd" "$device"
+	Echo "Restore old partition scheme by:\n    sgdisk -l sgdisk.backup"
+	[[ $scheme = gpt ]] && sgdisk "$sgdiskcmd" "$device" ||
+		echo -e "$fdiskcmd" |fdisk "$device"
 	force_reencrypt=1
 fi
 
@@ -483,13 +487,13 @@ else
 	[[ -z $root_fs ]] &&
 		Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
 		return 32
-	[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs)$ ]] &&
+	[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|zfs|)$ ]] &&
 		Exit "Root partition has unsupported filesystem: $root_fs" && return 33
 fi
 
 if [[ $boot_part ]]
 then
-	[[ ! $boot_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
+	[[ ! $boot_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|zfs|)$ ]] &&
 		Exit "Wrong value for boot_fs: '$boot_fs'" && return 34
 	if [[ $boot_fs ]]
 	then
