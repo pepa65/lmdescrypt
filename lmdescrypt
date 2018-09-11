@@ -1,6 +1,6 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
-trap 'set +o errexit; return 1' ERR
+trap 'set +o errexit; reset -I; return 1' ERR
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 2' INT TERM
 version=0.991
 
@@ -78,8 +78,8 @@ version=0.991
 ##           <partition>: efi|bios|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
 ##   Max. 1 efi, 1 boot, 1 of luks/lvm/zfs ('none' as many as needed)
 ### Partitioning scheme
-autopart=/dev/sda:dos,bios:1M,luks:rest
-autopart=/dev/sda:gpt,efi:20M,boot:500M,luks:rest
+autopart=/dev/sda:dos,efi:32M,luks:rest
+autopart=/dev/sda:gpt,bios:1M,boot:500M,luks:rest
 autopart=/dev/sda:gpt,efi:300M,zfs:rest
 autopart=/dev/sda:gpt,efi:300M,luks:rest
 ## (Only the last one takes effect!)
@@ -96,7 +96,7 @@ grub_device=/dev/sda
 ## GPT non-UEFI setup: Must have a bios partition (type ef02) of at least 2M!
 ### Partitions to use:
 boot_part=
-vg_part=/dev/sda2
+vg_part=
 ## Both are IGNORED/OVERWRITTEN when autopart is set!
 
 ## When boot_part is not set, this is ignored
@@ -159,7 +159,7 @@ data_size=
 ##  (Pre-existing filesystem will be kept!)
 ## Supported for boot & root: btrfs ext2 ext3 ext4 reiserfs xfs zfs.
 ## Supported for swap: swap.  For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs
-##  minix msdos ntfs reiserfs vfat xfs zfs.
+##  minix msdos ntfs reiserfs vfat xfs zfs. (But btrfs not included in LM17!)
 ### Filesystems:
 boot_fs=ext4
 root_fs=btrfs
@@ -274,6 +274,7 @@ Checklabel data && return 15
 	return 16
 
 ## Auto-partition
+[[ -e /sys/firmware/efi ]] && uefi=1 || uefi=0
 if [[ $autopart ]]
 then
 	declare -A dostype gpttype gptlabel
@@ -281,12 +282,18 @@ then
 	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0700)
 	gptlabel=([efi]="'EFI System'" [bios]="'BIOS boot partition'" [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
 	IFS=':,' read device scheme parts <<<"$autopart"
-	! [[ $scheme = dos || $scheme = gpt ]] &&
-		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
-		return 17
+	if [[ $scheme = dos ]]
+	then
+		((uefi)) && Exit "DOS partitioning scheme invalid on UEFI system" &&
+			return 17
+	else
+		[[ ! $scheme = gpt ]] &&
+			Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
+			return 17
+	fi
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
 	fdiskcmd="echo -e \"o\n" sgdiskcmd=("sgdisk" "-Zo")
-	size= n=1 boot_part= vg_part= efi= bios=
+	size= n=1 boot_part= vg_part= efi_part= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
@@ -307,9 +314,9 @@ then
 				return 21
 			boot_part=$part ;;
 		efi)
-			[[ $efi ]] && Exit "Only 1 EFI partition allowed" &&
+			[[ $efi_part ]] && Exit "Only 1 EFI partition allowed" &&
 				return 22
-			efi=$part ;;
+			efi_part=$device$n ;;
 		bios)
 			[[ $scheme = dos ]] &&
 				Exit "No BIOS partition on DOS partition scheme allowed" &&
@@ -329,7 +336,7 @@ then
 	done
 	fdiskcmd+="w\n\" |fdisk $device"
 	sgdiskcmd+=("-g" "$device")
-	[[ $scheme = gpt && ! -e /sys/firmware/efi && -z $bios ]] &&
+	((!uefi)) && [[ $scheme = gpt && -z $bios ]] &&
 		Exit "Non-UEFI GPT setups need a BIOS partition!" &&
 		return 26
 	sgdisk -b sgdisk.bck "$device"
@@ -390,24 +397,35 @@ else
 	fi
 fi
 
-## Check type of setup
-gdisk=$(echo 2 |gdisk -l "$grub_device")
-efi_part=
-if ! grep -q ' GPT: not present$' <<<"$gdisk"
-then  ## GPT partition scheme
-	if [[ -e /sys/firmware/efi ]]
-	then  ## UEFI: so it is an amd64 architecture that supports UEFI
-		read n discard <<<"$(grep ' EF00  ' <<<"$gdisk" |head -1)"
-		[[ -z $n ]] && Exit "UEFI without type ef00 efi partition!" &&
+## Determine partitioning scheme
+if [[ -z $scheme ]]
+then ## Not auto-partitioned
+	gdisk=$(echo 2 |gdisk -l /dev/sd?)
+	## There could be more than 1 device...
+	device=$(grep -A 1 '^Found valid GPT' <<<"$gdisk") &&
+		scheme=gpt || scheme=dos
+	device=$(grep -o '/dev/sd.' <<<"$device")
+fi
+
+if ((uefi))
+then ## Must have GPT scheme and EFI partition
+	[[ $scheme = dos ]] &&
+		Exit "UEFI systems must have a GPT partitioning scheme" &&
+		return 
+	if [[ -z $efi_part ]]
+	then ## Not auto-partitioned
+		## There could be more than 1 EFI partition...
+		! efi_part=$(grep 'EFI System$' <<<"$(fdisk -l /dev/sd?)") &&
+			Exit "UEFI without EFI partition!" &&
 			return 35
-		efi_part="$grub_device$n"
-		[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
-			mkfs.vfat -n EFI "$efi_part"
-	else  ## non-UEFI GPT setup
-		! grep -q ' EF02  ' <<<"$gdisk" &&
-			Exit "Non-UEFI GPT setup without type ef02 bios partition" &&
-			return 36
+		efi_part=${efi_part%% *}"
 	fi
+	[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
+		mkfs.vfat -n EFI "$efi_part"
+else  ## Must have BIOS if GPT scheme
+	[[ $scheme = gpt ]] && ! grep -q ' EF02  ' <<<"$gdisk" &&
+		Exit "Non-UEFI GPT setup without BIOS partition" &&
+		return 36
 fi
 
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
@@ -469,7 +487,7 @@ swap_dev="/dev/$vg_label/$swap_label"
 
 ## Create & format swap if wanted
 if [[ $swap_size ]]
-then
+then # lvcreate -Wy is not supported on 2.02.98 (LM17)
 	[[ ! -h $swap_dev ]] && lvcreate -Wy $lvm_swap -n $swap_label $vg_label
 	if [[ $swap_fs ]]
 	then
@@ -657,7 +675,7 @@ cat <<X
 #!/bin/bash
 set +o verbose -o errtrace
 export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-hash -l lvmetad && lvmetad -p /lvm.pid
+type -p lvmetad 2>/dev/null && lvmetad -p /lvm.pid
 mount -t sysfs sys /sys
 mount -t proc proc /proc
 mount -t devpts pts /dev/pts
