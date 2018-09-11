@@ -418,7 +418,7 @@ then ## Must have GPT scheme and EFI partition
 		! efi_part=$(grep 'EFI System$' <<<"$(fdisk -l /dev/sd?)") &&
 			Exit "UEFI without EFI partition!" &&
 			return 35
-		efi_part=${efi_part%% *}"
+		efi_part=${efi_part%% *}
 	fi
 	[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
 		mkfs.vfat -n EFI "$efi_part"
@@ -553,7 +553,7 @@ then
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		[[ -z $boot_fs ]] &&
-			Exit "Boot partition $boot_part has no filesystem, fill in 'boot_fs' (or leave boot_part empty)" &&
+			Exit "No pre-existing filesystem on boot partition $boot_part: set boot_fs" &&
 			return 48
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
