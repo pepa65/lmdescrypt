@@ -285,7 +285,8 @@ then
 		Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
 		return 17
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
-	fdiskcmd="echo -e \"o\n" sgdiskcmd=("-Zo") size= n=1 boot_part= vg_part= efi= bios=
+	fdiskcmd="echo -e \"o\n" sgdiskcmd=("sgdisk" "-Zo")
+	size= n=1 boot_part= vg_part= efi= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
@@ -606,9 +607,9 @@ else
 	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
 	if ((include_isofile))
 	then
-		cd=$(df |grep -o '^/dev/sr..')
+		cd=$(df |grep -o '^/dev/sr[^ ]*')
 		isoname=$(grep '^GRUB_TITLE=' "$target/etc/linuxmint/info")
-		isoname=${isoname/GRUB_TITLE=/}
+		isoname=${isoname#GRUB_TITLE=}
 		isofile="/$(date +%s).iso"
 		Echo "Copying the iso..."
 		dd if=$cd of="$target/boot$isofile"
