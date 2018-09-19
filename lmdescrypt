@@ -623,8 +623,18 @@ then
 	sed -i 's@ splash"$@"@' "$target/etc/default/grub"
 else
 	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
-	if ((include_isofile))
+fi
+
+if ((include_isofile))
+then
+	iso_size=$(lsblk -nbo SIZE /dev/sr0)
+	[[ $boot_part ]] &&
+		iso_room=$(($(lsblk -nbo SIZE "$boot_part")-100000000)) ||
+		iso_room=$(du --max-depth=0 -b /target) iso_room=${iso_room%%$'\t'*}
+	if ((iso_size>iso_room-10000000))
 	then
+		Echo "Not enough space to include the iso file, skipping..."
+	else
 		cd=$(df |grep -o '^/dev/sr[^ ]*')
 		isoname=$(grep '^PRETTY_NAME=' "$target/etc/os-release")
 		isoname=${isoname#PRETTY_NAME=}
@@ -648,6 +658,7 @@ else
 		X
 	fi
 fi
+
 sed -i 's/^GRUB_TIMEOUT=10/GRUB_TIMEOUT=4/' "$target/etc/default/grub"
 sed -i 's/^GRUB_HIDDEN_TIMEOUT=0/#GRUB_HIDDEN_TIMEOUT=0/' "$target/etc/default/grub"
 echo "$crypt_label UUID=$crypt_uuid $p3 $p4" >"$target/etc/crypttab"
