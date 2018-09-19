@@ -312,7 +312,7 @@ then
 		boot)
 			[[ $boot_part ]] && Exit "Only 1 boot partition allowed" &&
 				return 21
-			boot_part=$part ;;
+			boot_part=$device$n ;;
 		efi)
 			[[ $efi_part ]] && Exit "Only 1 EFI partition allowed" &&
 				return 22
@@ -398,9 +398,9 @@ else
 fi
 
 ## Determine partitioning scheme
+gdisk=$(echo 2 |gdisk -l /dev/sd?)
 if [[ -z $scheme ]]
 then ## Not auto-partitioned
-	gdisk=$(echo 2 |gdisk -l /dev/sd?)
 	## There could be more than 1 device...
 	device=$(grep -A 1 '^Found valid GPT' <<<"$gdisk") &&
 		scheme=gpt || scheme=dos
@@ -411,7 +411,7 @@ if ((uefi))
 then ## Must have GPT scheme and EFI partition
 	[[ $scheme = dos ]] &&
 		Exit "UEFI systems must have a GPT partitioning scheme" &&
-		return 
+		return 34
 	if [[ -z $efi_part ]]
 	then ## Not auto-partitioned
 		## There could be more than 1 EFI partition...
@@ -423,7 +423,7 @@ then ## Must have GPT scheme and EFI partition
 	[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
 		mkfs.vfat -n EFI "$efi_part"
 else  ## Must have BIOS if GPT scheme
-	[[ $scheme = gpt ]] && ! grep -q ' EF02  ' <<<"$gdisk" &&
+	[[ $scheme = gpt ]] && ! grep -q ' EF02 ' <<<"$gdisk" &&
 		Exit "Non-UEFI GPT setup without BIOS partition" &&
 		return 36
 fi
@@ -626,8 +626,8 @@ else
 	if ((include_isofile))
 	then
 		cd=$(df |grep -o '^/dev/sr[^ ]*')
-		isoname=$(grep '^GRUB_TITLE=' "$target/etc/linuxmint/info")
-		isoname=${isoname#GRUB_TITLE=}
+		isoname=$(grep '^PRETTY_NAME=' "$target/etc/os-release")
+		isoname=${isoname#PRETTY_NAME=}
 		isofile="/$(date +%s).iso"
 		Echo "Copying the iso..."
 		dd if=$cd of="$target/boot$isofile"
