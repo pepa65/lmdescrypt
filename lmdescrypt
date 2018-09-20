@@ -2,11 +2,11 @@
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o errexit; reset -I; return 1' ERR
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 2' INT TERM
-version=0.991
+version=0.992
 
 ############################################################################
 #
-#  lmdescrypt 0.991
+#  lmdescrypt 0.992
 #
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
@@ -366,7 +366,7 @@ then
 		mv -n sfdisk.bck sfdisk.backup
 		echo -e "Restore old partition scheme by:\n  sfdisk $newdevice <sfdisk.backup"
 	fi
-	if [[ $sch = gpt ]]
+	if [[ $newscheme = gpt ]]
 	then
 		! "${sgdiskcmd[@]}" &&
 			Exit "Error $? partitioning after:\n${sgdiskcmd[@]}" &&
