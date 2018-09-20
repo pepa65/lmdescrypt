@@ -159,7 +159,8 @@ data_size=
 ##  (Pre-existing filesystem will be kept!)
 ## Supported for boot & root: btrfs ext2 ext3 ext4 reiserfs xfs zfs.
 ## Supported for swap: swap.  For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs
-##  minix msdos ntfs reiserfs vfat xfs zfs. (But btrfs not included in LM17!)
+##  minix msdos ntfs reiserfs vfat xfs zfs.
+## Linux Mint 17 does not support btrfs!
 ### Filesystems:
 boot_fs=ext4
 root_fs=btrfs
@@ -273,6 +274,9 @@ Checklabel data && return 15
 	Exit "Wrong value for root_fs: '$root_fs'" &&
 	return 16
 
+osrelease=$(</etc/os-release)
+grep -q 'Linux Mint 17' <<<"$osrelease" && wy= lm17=y || wy=-Wy lm17=
+
 ## Auto-partition
 [[ -e /sys/firmware/efi ]] && uefi=1 || uefi=0
 if [[ $autopart ]]
@@ -289,7 +293,7 @@ then
 	else
 		[[ ! $scheme = gpt ]] &&
 			Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
-			return 17
+			return 18
 	fi
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
 	fdiskcmd="echo -e \"o\n" sgdiskcmd=("sgdisk" "-Zo")
@@ -487,8 +491,8 @@ swap_dev="/dev/$vg_label/$swap_label"
 
 ## Create & format swap if wanted
 if [[ $swap_size ]]
-then # lvcreate -Wy is not supported on 2.02.98 (LM17)
-	[[ ! -h $swap_dev ]] && lvcreate -Wy $lvm_swap -n $swap_label $vg_label
+then
+	[[ ! -h $swap_dev ]] && lvcreate $wy $lvm_swap -n $swap_label $vg_label
 	if [[ $swap_fs ]]
 	then
 		[[ ! $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" &&
@@ -500,13 +504,13 @@ fi
 
 ## Create and format root partition, and data partition if wanted
 [[ ! $root_size = REST ]] && [[ ! -h $root_dev ]] &&
-	lvcreate -Wy -L $root_size -Zy -n $root_label $vg_label
+	lvcreate $wy -L $root_size -Zy -n $root_label $vg_label
 if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
 	[[ ! -h $data_dev && $data_size = EXISTING ]] &&
 		Exit "There is no existing data device $data_dev" &&
 		return 39
-	lvcreate -Wy $lvm_data -n $data_label $vg_label
+	lvcreate $wy $lvm_data -n $data_label $vg_label
 	if [[ $data_fs ]]
 	then
 		! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
@@ -525,7 +529,7 @@ then  ## Create if it doesn't exist and format if required
 	fi
 fi
 [[ $root_size = REST ]] && [[ ! -h $root_dev ]] &&
-	lvcreate -Wy -l 100%FREE -Zy -n $root_label $vg_label
+	lvcreate $wy -l 100%FREE -Zy -n $root_label $vg_label
 if [[ $root_fs ]]
 then
 	! Mkfs "$root_fs" "$root_label" "$root_dev" root &&
@@ -591,7 +595,6 @@ Echo "Copying the system files..."
 cp -a "$rofs"/* "$target"
 aptsrc="/etc/apt/sources.list"
 rm "$target/$aptsrc"
-osrelease=$(</etc/os-release)
 grep -q '^ID=ubuntu' <<<"$osrelease" && apt-add-repository universe
 ! grep -q 'Linux Mint 19' <<<"$osrelease" && cp "$aptsrc" "$target/$aptsrc"
 
@@ -637,7 +640,7 @@ then
 		Echo "Not enough space to include the iso file, skipping..."
 	else
 		cd=$(df |grep -o '^/dev/sr[^ ]*')
-		isoname=$(grep '^PRETTY_NAME=' "$target/etc/os-release")
+		isoname=$(grep '^PRETTY_NAME=' <<<"osrelease")
 		isoname=${isoname#PRETTY_NAME=}
 		isofile="/$(date +%s).iso"
 		Echo "Copying the iso..."
@@ -751,7 +754,7 @@ then
 			-o Dpkg::Options::="--force-confdef" \
 			-o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
 	grub-install --force --recheck --target=x86_64-efi --efi-directory="$efi_dir" "$grub_device"
-	grep -q '^Linux Mint 17' /etc/issue &&
+	[[ $lm17 ]] &&
 		sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
 	update-grub
 	cp "$efi_dir"/EFI/*/grubx64.efi "$efi_dir/EFI/boot/bootx64.efi"
