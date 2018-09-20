@@ -243,36 +243,36 @@ self=$(basename $BASH_SOURCE)
 	exit 1
 ((EUID)) &&
 	Exit "Must be run with root privileges, do:\n   sudo -i\n   source $self" &&
-	return 5
+	return 3
 
 ## Set parameters from commandline
 for p in "$@"
 do
 	[[ ! $p =~ ^[a-z_][a-z0-9_]*= ]] &&
 		Exit "No variable assignment: $p" &&
-		return 6
+		return 4
 	q="${p/=/=\'}'"
 	! eval "$q" && Exit "Failed argument evaluation: '$p'" &&
-		return 7
+		return 5
 	echo "    ${q%%=*}: ${q#*=}"
 done
 
 ## Check names, labels, root_fs
 [[ ! $username =~ ^[a-z_][a-z0-9_]*$ ]] &&
 	Exit "Illegal format for username: '$username'" &&
-	return 8
+	return 6
 [[ ! $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] &&
 	Exit "Illegal format for hostname: '$hostname'" &&
-	return 9
-Checklabel crypt && return 10
-Checklabel vg && return 11
-Checklabel boot && return 12
-Checklabel root && return 13
-Checklabel swap && return 14
-Checklabel data && return 15
+	return 7
+Checklabel crypt && return 8
+Checklabel vg && return 9
+Checklabel boot && return 10
+Checklabel root && return 11
+Checklabel swap && return 12
+Checklabel data && return 13
 [[ ! $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
 	Exit "Wrong value for root_fs: '$root_fs'" &&
-	return 16
+	return 14
 
 issue=$(</etc/issue) wy=-Wy lm17=
 if grep -q 'Linux Mint 17' <<<"$issue"
@@ -280,7 +280,8 @@ then
 	wy= lm17=y
 	[[ $root_fs$boot_fs$data_fs == *btrfs* ]] &&
 		echo "Linux Mint 17 does not support btrfs, trying to fetch & install" &&
-		apt install btrfs-tools
+		! apt-get install btrfs-tools && Exit "Failed to fetch btrfs-tools" &&
+		return 15
 fi
 
 ## Determine partitioning scheme
@@ -301,11 +302,11 @@ then
 	if [[ $newscheme = dos ]]
 	then
 		((uefi)) && Exit "DOS partitioning scheme invalid on UEFI system" &&
-			return 17
+			return 16
 	else
 		[[ ! $newscheme = gpt ]] &&
 			Exit "Partitioning scheme should be 'dos' or 'gpt', not: $newscheme" &&
-			return 18
+			return 17
 	fi
 	Echo "Auto-partitioning $newdevice with ${newscheme^^} scheme"
 	fdiskcmd="o\n" sgdiskcmd=("sgdisk" "-Zo")
@@ -431,13 +432,13 @@ if ((uefi))
 then ## Must have GPT scheme and EFI partition
 	[[ $scheme = dos ]] &&
 		Exit "UEFI systems must have a GPT partitioning scheme" &&
-		return 34
+		return 35
 	if [[ -z $efi_part ]]
 	then ## Not auto-partitioned
 		## There could be more than 1 EFI partition...
 		! efi_part=$(grep 'EFI System$' <<<"$(fdisk -l /dev/sd?)") &&
 			Exit "UEFI without EFI partition!" &&
-			return 35
+			return 36
 		efi_part=${efi_part%% *}
 	fi
 	[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
@@ -445,7 +446,7 @@ then ## Must have GPT scheme and EFI partition
 else  ## Must have BIOS if GPT scheme
 	[[ $scheme = gpt ]] && ! grep -q ' EF02 ' <<<"$gdisk" &&
 		Exit "Non-UEFI GPT setup without BIOS partition" &&
-		return 36
+		return 37
 fi
 
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
@@ -492,7 +493,7 @@ crypt_dev="/dev/mapper/$crypt_label"
 	! cryptsetup luksOpen "$vg_part" $crypt_label --key-file "$pwf" &&
 	shred -u "$pwf" &&
 		Exit "Failed to open the encrypted partition $vg_part" &&
-		return 37
+		return 38
 shred -u "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$vg_part")
 
@@ -738,7 +739,7 @@ cat <<X
 shred -u "\$pwf"
 dpkg-reconfigure tzdata
 dpkg-reconfigure keyboard-configuration 2>/dev/null
-if [[ "$efi_part" ]]
+if ((uefi))
 then
 	mkdir /media/cdrom
 	mount /dev/sr0 /media/cdrom
@@ -747,7 +748,7 @@ then
 fi
 if [[ "$packages" ]]
 then
-	[[ "$efi_part" ]] || apt-get update
+	((uefi)) || apt-get update
 	apt-get --yes install $packages
 fi
 X
@@ -760,12 +761,12 @@ fi
 efi_dir=/boot/efi
 cat <<X
 chmod 600 "/boot/initrd.img-\$(uname -r)"
-if [[ "$efi_part" ]]
+if ((uefi))
 then
 	mkdir -p "$efi_dir"
 	mount "$efi_part" "$efi_dir"
 	mkdir -p "$efi_dir/EFI/boot"
-	DEBIAN_FRONTEND=noninteractive apt install \
+	DEBIAN_FRONTEND=noninteractive apt-get install \
 			-o Dpkg::Options::="--force-confdef" \
 			-o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
 	grub-install --force --recheck --target=x86_64-efi --efi-directory="$efi_dir" "$grub_device"
