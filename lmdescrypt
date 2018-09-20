@@ -274,8 +274,8 @@ Checklabel data && return 15
 	Exit "Wrong value for root_fs: '$root_fs'" &&
 	return 16
 
-osrelease=$(</etc/os-release)
-grep -q 'Linux Mint 17' <<<"$osrelease" && wy= lm17=y || wy=-Wy lm17=
+issue=$(</etc/issue)
+grep -q 'Linux Mint 17' <<<"$issue" && wy= lm17=y || wy=-Wy lm17=
 
 ## Auto-partition
 [[ -e /sys/firmware/efi ]] && uefi=1 || uefi=0
@@ -597,8 +597,8 @@ Echo "Copying the system files..."
 cp -a "$rofs"/* "$target"
 aptsrc="/etc/apt/sources.list"
 rm "$target/$aptsrc"
-grep -q '^ID=ubuntu' <<<"$osrelease" && apt-add-repository universe
-! grep -q 'Linux Mint 19' <<<"$osrelease" && cp "$aptsrc" "$target/$aptsrc"
+grep -q '^Ubuntu' <<<"$issue" && apt-add-repository universe
+! grep -q '^Linux Mint 19' <<<"$issue" && cp "$aptsrc" "$target/$aptsrc"
 
 ## Prepare root
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
@@ -642,8 +642,7 @@ then
 		Echo "Not enough space to include the iso file, skipping..."
 	else
 		cd=$(df |grep -o '^/dev/sr[^ ]*')
-		isoname=$(grep '^PRETTY_NAME=' <<<"osrelease")
-		isoname=${isoname#PRETTY_NAME=}
+		isoname=${issue%% \\*}
 		isofile="/$(date +%s).iso"
 		Echo "Copying the iso..."
 		dd if=$cd of="$target/boot$isofile"
