@@ -296,7 +296,7 @@ then
 			return 18
 	fi
 	Echo "Auto-partitioning $device with ${scheme^^} scheme"
-	fdiskcmd="echo -e \"o\n" sgdiskcmd=("sgdisk" "-Zo")
+	fdiskcmd="o\n" sgdiskcmd=("sgdisk" "-Zo")
 	size= n=1 boot_part= vg_part= efi_part= bios=
 	while [[ $parts ]]
 	do
@@ -333,12 +333,12 @@ then
 			Exit "Bad size '$size' in auto-partitioning" &&
 			return 25
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=+$size
-		fdiskcmd+="n\n\n\n\n$dossize\nt\n${dostype[$part]}\n"
+		fdiskcmd+="n\n\n\n\n$dossize\nt\n$n\n${dostype[$part]}\n"
 		sgdiskcmd+=("-n$n::$gptsize" "-t$n:${gpttype[$part]}" "-c$n:${gptlabel[$part]}")
 		echo "$device$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
 		((n++))
 	done
-	fdiskcmd+="w\n\" |fdisk $device"
+	fdiskcmd+="w\n"
 	sgdiskcmd+=("-g" "$device")
 	((!uefi)) && [[ $scheme = gpt && -z $bios ]] &&
 		Exit "Non-UEFI GPT setups need a BIOS partition!" &&
@@ -352,7 +352,9 @@ then
 			Exit "Error $? partitioning after:\n${sgdiskcmd[@]}" &&
 			return 27
 	else
-		! "$fdiskcmd" && Exit "Error $? partitioning after:\n$fdiskcmd" &&
+		sgdisk -Zo -g "$device"
+		! echo -e "$fdiskcmd" |fdisk "$device" &&
+			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $device" &&
 			return 28
 	fi
 	force_reencrypt=1
