@@ -277,25 +277,32 @@ Checklabel data && return 15
 issue=$(</etc/issue)
 grep -q 'Linux Mint 17' <<<"$issue" && wy= lm17=y || wy=-Wy lm17=
 
-## Auto-partition
+## Determine partitioning scheme
 [[ -e /sys/firmware/efi ]] && uefi=1 || uefi=0
+gdisk=$(echo 2 |gdisk -l /dev/sd?)
+## There could be more than 1 device...
+device=$(grep -A 1 '^Found valid GPT' <<<"$gdisk") && scheme=gpt || scheme=dos
+device=$(grep -o '/dev/sd.' <<<"$device")
+fi
+
+## Auto-partition
 if [[ $autopart ]]
 then
 	declare -A dostype gpttype gptlabel
 	dostype=([efi]=ef [boot]=83 [luks]=da [lvm]=8e [zfs]=83 [none]=0)
 	gpttype=([efi]=ef00 [bios]=ef02 [boot]=8300 [luks]=8301 [lvm]=8e00 [zfs]=8300 [none]=0700)
 	gptlabel=([efi]="'EFI System'" [bios]="'BIOS boot partition'" [boot]=$boot_label [luks]=$crypt_label [lvm]=$vg_label [zfs]=$vg_label [none]=none)
-	IFS=':,' read device scheme parts <<<"$autopart"
-	if [[ $scheme = dos ]]
+	IFS=':,' read newdevice newscheme parts <<<"$autopart"
+	if [[ $newscheme = dos ]]
 	then
 		((uefi)) && Exit "DOS partitioning scheme invalid on UEFI system" &&
 			return 17
 	else
-		[[ ! $scheme = gpt ]] &&
-			Exit "Partitioning scheme should be 'dos' or 'gpt', not: $scheme" &&
+		[[ ! $newscheme = gpt ]] &&
+			Exit "Partitioning scheme should be 'dos' or 'gpt', not: $newscheme" &&
 			return 18
 	fi
-	Echo "Auto-partitioning $device with ${scheme^^} scheme"
+	Echo "Auto-partitioning $newdevice with ${newscheme^^} scheme"
 	fdiskcmd="o\n" sgdiskcmd=("sgdisk" "-Zo")
 	size= n=1 boot_part= vg_part= efi_part= bios=
 	while [[ $parts ]]
@@ -312,17 +319,17 @@ then
 			[[ $vg_part ]] &&
 				Exit "More than 1 partition of type luks/lvm/zfs" &&
 				return 20
-			vg_part=$device$n ;;
+			vg_part=$newdevice$n ;;
 		boot)
 			[[ $boot_part ]] && Exit "Only 1 boot partition allowed" &&
 				return 21
-			boot_part=$device$n ;;
+			boot_part=$newdevice$n ;;
 		efi)
 			[[ $efi_part ]] && Exit "Only 1 EFI partition allowed" &&
 				return 22
-			efi_part=$device$n ;;
+			efi_part=$newdevice$n ;;
 		bios)
-			[[ $scheme = dos ]] &&
+			[[ $newscheme = dos ]] &&
 				Exit "No BIOS partition on DOS partition scheme allowed" &&
 				return 23
 			[[ $bios ]] && Exit "Only 1 BIOS partition allowed" &&
@@ -335,29 +342,40 @@ then
 		[[ $size = rest ]] && dossize= gptsize=-0 || dossize=+$size gptsize=+$size
 		fdiskcmd+="n\n\n\n\n$dossize\nt\n$n\n${dostype[$part]}\n"
 		sgdiskcmd+=("-n$n::$gptsize" "-t$n:${gpttype[$part]}" "-c$n:${gptlabel[$part]}")
-		echo "$device$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
+		echo "$newdevice$n  $size  ${gpttype[$part]}  ${gptlabel[$part]}"
 		((n++))
 	done
 	fdiskcmd+="w\n"
-	sgdiskcmd+=("-g" "$device")
-	((!uefi)) && [[ $scheme = gpt && -z $bios ]] &&
+	sgdiskcmd+=("-g" "$newdevice")
+	((!uefi)) && [[ $newscheme = gpt && -z $bios ]] &&
 		Exit "Non-UEFI GPT setups need a BIOS partition!" &&
 		return 26
-	sgdisk -b sgdisk.bck "$device"
-	mv -n sgdisk.bck sgdisk.backup
-	echo -e "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
 	if [[ $scheme = gpt ]]
+	then
+		sgdisk -b sgdisk.bck "$newdevice"
+		mv -n sgdisk.bck sgdisk.backup
+		echo -e "Restore old partition scheme by:\n  sgdisk -l sgdisk.backup"
+	else
+		sfdisk --dump "$newdevice" >sfdisk.bck
+		mv -n sfdisk.bck sfdisk.backup
+		echo -e "Restore old partition scheme by:\n  sfdisk $newdevice <sfdisk.backup"
+	fi
+	if [[ $sch = gpt ]]
 	then
 		! "${sgdiskcmd[@]}" &&
 			Exit "Error $? partitioning after:\n${sgdiskcmd[@]}" &&
 			return 27
 	else
-		sgdisk -Zo -g "$device"
-		! echo -e "$fdiskcmd" |fdisk "$device" &&
-			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $device" &&
+		size=$(lsblk -nbo SIZE "$newdevice")
+		dd if=/dev/null of=$newdevice bs=512 count=34
+		dd if=/dev/null of=$newdevice bs=512 count=34 skip=$((size/512-34))
+		! echo -e "$fdiskcmd" |fdisk "$newdevice" &&
+			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $newdevice" &&
 			return 28
 	fi
 	force_reencrypt=1
+	device=$newdevice
+	scheme=$newscheme
 fi
 
 ## Check existence of mandatory devices
@@ -401,16 +419,6 @@ else
 			return 34
 		lvm_swap="-L $swap_size -Cy -Zy"
 	fi
-fi
-
-## Determine partitioning scheme
-gdisk=$(echo 2 |gdisk -l /dev/sd?)
-if [[ -z $scheme ]]
-then ## Not auto-partitioned
-	## There could be more than 1 device...
-	device=$(grep -A 1 '^Found valid GPT' <<<"$gdisk") &&
-		scheme=gpt || scheme=dos
-	device=$(grep -o '/dev/sd.' <<<"$device")
 fi
 
 if ((uefi))
