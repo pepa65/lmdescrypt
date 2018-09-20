@@ -160,7 +160,7 @@ data_size=
 ## Supported for boot & root: btrfs ext2 ext3 ext4 reiserfs xfs zfs.
 ## Supported for swap: swap.  For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs
 ##  minix msdos ntfs reiserfs vfat xfs zfs.
-## Linux Mint 17 does not support btrfs!
+## Linux Mint 17 does not come with btrfs, needs to be downloaded!
 ### Filesystems:
 boot_fs=ext4
 root_fs=btrfs
@@ -274,8 +274,14 @@ Checklabel data && return 15
 	Exit "Wrong value for root_fs: '$root_fs'" &&
 	return 16
 
-issue=$(</etc/issue)
-grep -q 'Linux Mint 17' <<<"$issue" && wy= lm17=y || wy=-Wy lm17=
+issue=$(</etc/issue) wy=-Wy lm17=
+if grep -q 'Linux Mint 17' <<<"$issue"
+then
+	wy= lm17=y
+	[[ $root_fs$boot_fs$data_fs == *btrfs* ]] &&
+		echo "Linux Mint 17 does not support btrfs, trying to fetch & install" &&
+		apt install btrfs-tools
+fi
 
 ## Determine partitioning scheme
 [[ -e /sys/firmware/efi ]] && uefi=1 || uefi=0
@@ -283,7 +289,6 @@ gdisk=$(echo 2 |gdisk -l /dev/sd?)
 ## There could be more than 1 device...
 device=$(grep -A 1 '^Found valid GPT' <<<"$gdisk") && scheme=gpt || scheme=dos
 device=$(grep -o '/dev/sd.' <<<"$device")
-fi
 
 ## Auto-partition
 if [[ $autopart ]]
@@ -366,12 +371,13 @@ then
 			Exit "Error $? partitioning after:\n${sgdiskcmd[@]}" &&
 			return 27
 	else
-		size=$(lsblk -nbo SIZE "$newdevice")
+		size=$(lsblk -nbo SIZE "$newdevice"| head -1)
 		dd if=/dev/null of=$newdevice bs=512 count=34
 		dd if=/dev/null of=$newdevice bs=512 count=34 skip=$((size/512-34))
 		! echo -e "$fdiskcmd" |fdisk "$newdevice" &&
 			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $newdevice" &&
 			return 28
+		partprobe /dev/sda
 	fi
 	force_reencrypt=1
 	device=$newdevice
