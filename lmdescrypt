@@ -78,7 +78,7 @@ version=0.991
 ##           <partition>: efi|bios|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
 ##   Max. 1 efi, 1 boot, 1 of luks/lvm/zfs ('none' as many as needed)
 ### Partitioning scheme
-autopart=/dev/sda:dos,efi:32M,luks:rest
+autopart=/dev/sda:dos,efi:32M,lvm:rest
 autopart=/dev/sda:gpt,bios:1M,boot:500M,luks:rest
 autopart=/dev/sda:gpt,efi:300M,zfs:rest
 autopart=/dev/sda:gpt,efi:300M,luks:rest
@@ -495,6 +495,7 @@ then # lvcreate -Wy is not supported on 2.02.98 (LM17)
 			return 38 ||
 			mkswap -f -L $swap_label "$swap_dev"
 	fi
+	echo "RESUME=$swap_dev" >"$target/etc/initramfs-tools/conf.d/resume"
 fi
 
 ## Create and format root partition, and data partition if wanted
@@ -630,7 +631,7 @@ then
 	iso_size=$(lsblk -nbo SIZE /dev/sr0)
 	[[ $boot_part ]] &&
 		iso_room=$(($(lsblk -nbo SIZE "$boot_part")-100000000)) ||
-		iso_room=$(du --max-depth=0 -b /target) iso_room=${iso_room%%$'\t'*}
+		iso_room=$(du --max-depth=0 -b "$target") iso_room=${iso_room%%$'\t'*}
 	if ((iso_size>iso_room-10000000))
 	then
 		Echo "Not enough space to include the iso file, skipping..."
@@ -777,10 +778,10 @@ chmod +x "$target$inside"
 Echo "Finalizing settings on the install"
 chroot "$target" "$inside"
 
-[[ $(df --output=pcent $target |tail -1) = 100% ]] &&
+[[ $(df --output=pcent "$target" |tail -1) = 100% ]] &&
 	Exit "The filesystem on $root_dev is 100% full" &&
 	return 49
-[[ $boot_part && $(df --output=pcent $target/boot |tail -1) = 100% ]] &&
+[[ $boot_part && $(df --output=pcent "$target/boot" |tail -1) = 100% ]] &&
 	Exit "The filesystem on $boot_part is 100% full" &&
 	return 50
 
