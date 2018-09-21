@@ -210,7 +210,8 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) [[ ! $4 = data ]] && return 3 ;;&
 		## Continue even if the above pattern matched (unless $4 isn't data)
 		btrfs) mkfs.$1 -f -L "$2" "$3" ;;
-		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
+		ext2|ext3|ext4) [[ $4 = root ]] && mkfs.$1 -F -L "$2" "$3" ||
+			mkfs.$1 -m 0 -F -L "$2" "$3" ;;
 		hfs) mkfs.$1 -h -v "$2" "$3" ;;
 		hfsplus) mkfs.$1 -J -v "$2" "$3" ;;
 		jfs) mkfs.$1 -q -L "$2" "$3" ;;
@@ -516,7 +517,6 @@ then
 			return 38 ||
 			mkswap -f -L $swap_label "$swap_dev"
 	fi
-	echo "RESUME=$swap_dev" >"$target/etc/initramfs-tools/conf.d/resume"
 fi
 
 ## Create and format root partition, and data partition if wanted
@@ -622,7 +622,8 @@ echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
 	echo "$root_dev / $root_fs defaults,relatime,errors=remount-ro 0 1" \
 			>>"$target/etc/fstab"
 [[ $swap_size ]] &&
-	echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
+	echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab" &&
+	echo "RESUME=$swap_dev" >"$target/etc/initramfs-tools/conf.d/resume"
 [[ $data_size ]] &&
 	echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
 p3=none p4=luks
@@ -650,30 +651,29 @@ if ((include_isofile)) && [[ $boot_part ]]
 then
 	iso_size=$(lsblk -nbo SIZE /dev/sr0)
 	boot_size=$(lsblk -nbo SIZE "$boot_part")
-	if ((iso_size>iso_room-200000000))  ## set 200M aside, for 2 kernel versions
+	if ((iso_size>boot_size-200000000))  ## set 200M aside, for 2 kernel versions
 	then
 		Echo "Not enough space to include the iso file, skipping..."
 	else
-		cd=$(df |grep -o '^/dev/sr0')
 		isoname=${issue%% \\*}
 		isofile="$(date +%s).iso"
 		Echo "Copying the iso..."
-		dd if=$cd of="$target/boot/$isofile"
+		dd if=/dev/sr0 of="$target/boot/$isofile"
 		(cd "$target/boot"; ln -s "$isofile" "$isoname")
 		((lmde)) && dir=live || dir=casper
+		initrd=$(echo /cdrom/$dir/initrd.*) initrd=${initrd##*/}
 		sdxn=$(readlink -e "$boot_part" 2>/dev/null) || sdxn=$device
 		x=$(grep -o '/sd.' <<<"$sdxn")
 		root="hd$(($(printf '%d' "'${x: -1}")-97)),msdos${sdxn//[^0-9]/}"
 		echo "ISO $isoname is on ($root)/$isofile"
-		cat <<-X >>"$target/etc/grub.d/40_custom"
+		cat <<-END >>"$target/etc/grub.d/40_custom"
 			menuentry "Boot from ISO $isoname ($isofile)" {
-			  set root='$root'
-			  set isofile='$isofile'
-			  loopback loop /$isofile
-			  linux (loop)/$dir/vmlinuz boot=$dir iso-scan/filename=/$isofile noeject noprompt splash -- 
-			  initrd (loop)/$dir/initrd.lz
+			  set isofile='($root)/$isofile'
+			  loopback loop \$isofile
+			  linux (loop)/$dir/vmlinuz boot=$dir noeject noprompt splash --
+			  initrd (loop)/$dir/$initrd
 			}
-		X
+		END
 	fi
 fi
 
@@ -803,11 +803,9 @@ Echo "Finalizing settings on the install"
 chroot "$target" "$inside"
 
 [[ $(df --output=pcent "$target" |tail -1) = 100% ]] &&
-	Exit "The filesystem on $root_dev is 100% full" &&
-	return 49
+	Echo "The filesystem on $root_dev is 100% full!"
 [[ $boot_part && $(df --output=pcent "$target/boot" |tail -1) = 100% ]] &&
-	Exit "The filesystem on $boot_part is 100% full" &&
-	return 50
+	Echo "The filesystem on $boot_part is 100% full!"
 
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
@@ -817,12 +815,12 @@ umount "$target"
 sync
 sleep 1
 ! vgchange -an && Exit "Not able to close all logical volumes" &&
-	return 51
+	return 49
 sync
 sleep 1
 ! cryptsetup luksClose $crypt_label &&
 	Exit "Not able to cleanly close crypt" &&
-	return 52
+	return 50
 sync
 
 Echo "Ready for reboot!"
