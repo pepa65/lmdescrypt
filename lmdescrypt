@@ -700,95 +700,102 @@ mount --bind /dev "$target/dev"
 ## Prepare the chroot script
 inside="/root/$self.inside"
 ( ## Subshell start
-cat <<X
-#!/bin/bash
-set +o verbose -o errtrace
-export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-type -p lvmetad 2>/dev/null && lvmetad -p /lvm.pid
-mount -t sysfs sys /sys
-mount -t proc proc /proc
-mount -t devpts pts /dev/pts
-pvscan --cache
-locale-gen --purge --no-archive
-type -p localectl >/dev/null && localectl set-locale LANG=$LANG
-useradd -ms /bin/bash $username
-pwf=\$(mktemp) pwf2=\$(mktemp)
-chmod 600 "\$pwf" "\$pwf2"
-while [[ ! -s "\$pwf" ]]
-do
-	/lib/cryptsetup/askpass "Enter password for user $username: " >"\$pwf"
-	echo
-	if [[ -s "\$pwf" ]]
-	then
-		/lib/cryptsetup/askpass "Enter the same password again: " >"\$pwf2"
-		echo
-		diff -q --label \$'\b\b\b\b\b\b\b\bFirst' "\$pwf" \
-				--label "second password"	"\$pwf2" || shred -u "\$pwf"
-		shred "\$pwf2"
-	else
-		echo -e "Empty password not allowed\n"
-	fi
-done
-chpasswd <<<"$username:\$(cat "\$pwf")"
-addgroup $username sudo
-X
+cat <<-END
+	#!/bin/bash
+	set +o verbose -o errtrace
+	export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
+	type -p lvmetad 2>/dev/null && lvmetad -p /lvm.pid
+	mount -t sysfs sys /sys
+	mount -t proc proc /proc
+	mount -t devpts pts /dev/pts
+	pvscan --cache
+	locale-gen --purge --no-archive
+	type -p localectl >/dev/null && localectl set-locale LANG=$LANG
+	useradd -ms /bin/bash $username
+	pwf=\$(mktemp) pwf2=\$(mktemp)
+	chmod 600 "\$pwf" "\$pwf2"
+	while [[ ! -s "\$pwf" ]]
+	do
+	  /lib/cryptsetup/askpass "Enter password for user $username: " >"\$pwf"
+	  echo
+	  if [[ -s "\$pwf" ]]
+	  then
+	    /lib/cryptsetup/askpass "Enter the same password again: " >"\$pwf2"
+	    echo
+	    diff -q --label \$'\b\b\b\b\b\b\b\bFirst' "\$pwf" \
+	      --label "second password"	"\$pwf2" || shred -u "\$pwf"
+	    shred "\$pwf2"
+	  else
+	    echo -e "Empty password not allowed\n"
+	  fi
+	done
+	chpasswd <<<"$username:\$(cat "\$pwf")"
+	addgroup $username sudo
+END
+
 ((lmde)) && echo 'chpasswd <<<"root:$(cat "$pwf")"' || echo 'passwd -l root'
-cat <<X
-shred -u "\$pwf"
-dpkg-reconfigure tzdata
-dpkg-reconfigure keyboard-configuration 2>/dev/null
+
+echo 'shred -u "$pwf"'
+echo 'dpkg-reconfigure tzdata'
+echo 'dpkg-reconfigure keyboard-configuration 2>/dev/null'
+
 if ((uefi))
 then
-	mkdir /media/cdrom
-	mount /dev/sr0 /media/cdrom
-	apt-cdrom -m add -d=/media/cdrom
-	sed -i 's/^deb /deb [arch=amd64] /g' "$aptsrc"
+	echo 'mkdir /media/cdrom'
+	echo 'mount /dev/sr0 /media/cdrom'
+	echo 'apt-cdrom -m add -d=/media/cdrom'
+	echo "sed -i 's/^deb /deb [arch=amd64] /g' \"$aptsrc\""
 fi
-if [[ "$packages" ]]
+
+if [[ $packages ]]
 then
-	((uefi)) || apt-get update
-	apt-get --yes install $packages
+	((uefi)) || echo 'apt-get update'
+	echo "apt-get --yes install $packages"
 fi
-X
+
 if ((lmde))
 then
 	echo "apt-get -qq purge '^live-.*'"
 	echo 'rm -rvf /lib/live'
 	echo 'update-initramfs -c -k $(uname -r)'
 fi
-efi_dir=/boot/efi
-cat <<X
-chmod 600 "/boot/initrd.img-\$(uname -r)"
+
+echo 'chmod 600 "/boot/initrd.img-\$(uname -r)"'
 if ((uefi))
 then
-	mkdir -p "$efi_dir"
-	mount "$efi_part" "$efi_dir"
-	mkdir -p "$efi_dir/EFI/boot"
-	DEBIAN_FRONTEND=noninteractive apt-get install \
-			-o Dpkg::Options::="--force-confdef" \
-			-o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
-	grub-install --force --recheck --target=x86_64-efi --efi-directory="$efi_dir" "$grub_device"
 	[[ $lm17 ]] &&
-		sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
-	update-grub
-	cp "$efi_dir"/EFI/*/grubx64.efi "$efi_dir/EFI/boot/bootx64.efi"
-	umount "$efi_dir"
-	umount /media/cdrom
-	rmdir /media/cdrom
+		echo "sed -i 's/^quick_boot=\"1\"/quick_boot=\"0\"/g' /etc/grub.d/*"
+	cat <<-END
+		mkdir -p /boot/efi
+		mount "$efi_part" /boot/efi
+		mkdir -p /boot/efi/EFI/boot
+		DEBIAN_FRONTEND=noninteractive apt-get install \
+			-o Dpkg::Options::='--force-confdef' \
+			-o Dpkg::Options::='--force-confold' --yes --force-yes grub-efi mokutil
+		grub-install --force --recheck --target=x86_64-efi \
+			--efi-directory=/boot/efi "$grub_device"
+		update-grub
+		cp /boot/efi/EFI/*/grubx64.efi /boot/efi/EFI/boot/bootx64.efi
+		umount /boot/efi
+		umount /media/cdrom
+		rmdir /media/cdrom
+	END
 else
-	grub-install --force --recheck "$grub_device"
-	update-grub
+	echo "grub-install --force --recheck \"$grub_device\""
+	echo 'update-grub'
 fi
-[[ -f $aptsrc ]] && sed -i 's/^deb.* cdrom:.*/#\0/' "$aptsrc"
-gconftool-2 --set /apps/gksu/sudo-mode --type bool true 2>/dev/null
-umount /dev/pts
-umount /proc
-umount /sys
-[[ -f /lvm.pid ]] && kill -9 \$(cat /lvm.pid) && rm /lvm.pid
-exit 0
-X
-## Subshell end
-) >"$target$inside"
+[[ -f $aptsrc ]] && echo "sed -i 's/^deb.* cdrom:.*/#\0/' \"$aptsrc\""
+cat <<-END
+	gconftool-2 --set /apps/gksu/sudo-mode --type bool true 2>/dev/null
+	umount /dev/pts
+	umount /proc
+	umount /sys
+	[[ -f /lvm.pid ]] && kill -9 \$(cat /lvm.pid) && rm /lvm.pid
+	exit 0
+END
+
+) >"$target$inside"  ## Subshell end
+
 chmod +x "$target$inside"
 
 ## Enter the fresh installation to finish up
