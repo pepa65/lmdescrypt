@@ -664,7 +664,8 @@ then
 		initrd=$(echo /cdrom/$dir/initrd.*) initrd=${initrd##*/}
 		sdxn=$(readlink -e "$boot_part" 2>/dev/null) || sdxn=$device
 		x=$(grep -o '/sd.' <<<"$sdxn")
-		root="hd$(($(printf '%d' "'${x: -1}")-97)),msdos${sdxn//[^0-9]/}"
+		[[ $scheme = gpt ]] && sch=gpt || sch=msdos
+		root="hd$(($(printf '%d' "'${x: -1}")-97)),$sch${sdxn//[^0-9]/}"
 		echo "ISO $isoname is on ($root)/$isofile"
 		cat <<-END >>"$target/etc/grub.d/40_custom"
 			menuentry "Boot from ISO $isoname ($isofile)" {
