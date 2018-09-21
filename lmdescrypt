@@ -100,7 +100,7 @@ vg_part=
 ## Both are IGNORED/OVERWRITTEN when autopart is set!
 
 ## When boot_part is not set, this is ignored
-## If the boot partition is too small, the install will fail in the end!
+## The boot partition needs to be 200MB larger than the iso file!
 ### Set to 1 to include this iso as a file on boot partition to boot from
 include_isofile=1
 
@@ -646,33 +646,31 @@ else
 	echo "UUID=$boot_uuid /boot $boot_fs relatime 0 2" >>"$target/etc/fstab"
 fi
 
-if ((include_isofile))
+if ((include_isofile)) && [[ $boot_part ]]
 then
 	iso_size=$(lsblk -nbo SIZE /dev/sr0)
-	[[ $boot_part ]] &&
-		iso_room=$(($(lsblk -nbo SIZE "$boot_part")-100000000)) ||
-		iso_room=$(du --max-depth=0 -b "$target") iso_room=${iso_room%%$'\t'*}
-	if ((iso_size>iso_room-10000000))
+	boot_size=$(lsblk -nbo SIZE "$boot_part")
+	if ((iso_size>iso_room-200000000))  ## set 200M aside, for 2 kernel versions
 	then
 		Echo "Not enough space to include the iso file, skipping..."
 	else
-		cd=$(df |grep -o '^/dev/sr[^ ]*')
+		cd=$(df |grep -o '^/dev/sr0')
 		isoname=${issue%% \\*}
-		isofile="/$(date +%s).iso"
+		isofile="$(date +%s).iso"
 		Echo "Copying the iso..."
-		dd if=$cd of="$target/boot$isofile"
+		dd if=$cd of="$target/boot/$isofile"
 		(cd "$target/boot"; ln -s "$isofile" "$isoname")
 		((lmde)) && dir=live || dir=casper
-		sdxn=$(readlink -e "$boot_part")
+		sdxn=$(readlink -e "$boot_part" 2>/dev/null) || sdxn=$device
 		x=$(grep -o '/sd.' <<<"$sdxn")
 		root="hd$(($(printf '%d' "'${x: -1}")-97)),msdos${sdxn//[^0-9]/}"
-		echo "ISO $isoname is on ($root)$isofile"
+		echo "ISO $isoname is on ($root)/$isofile"
 		cat <<-X >>"$target/etc/grub.d/40_custom"
 			menuentry "Boot from ISO $isoname ($isofile)" {
 			  set root='$root'
 			  set isofile='$isofile'
-			  loopback loop \$isofile
-			  linux (loop)/$dir/vmlinuz boot=$dir iso-scan/filename=\$isofile noeject noprompt splash -- 
+			  loopback loop /$isofile
+			  linux (loop)/$dir/vmlinuz boot=$dir iso-scan/filename=/$isofile noeject noprompt splash -- 
 			  initrd (loop)/$dir/initrd.lz
 			}
 		X
