@@ -669,10 +669,10 @@ then
 		echo "ISO $isoname is on ($root)/$isofile"
 		cat <<-END >>"$target/etc/grub.d/40_custom"
 			menuentry "Boot from ISO $isoname ($isofile)" {
-			  set isofile='($root)/$isofile'
-			  loopback loop \$isofile
-			  linux (loop)/$dir/vmlinuz boot=$dir noeject noprompt splash --
-			  initrd (loop)/$dir/$initrd
+			  set f='/$isofile'
+			  loopback iso '($root)\$f'
+			  linux (iso)/$dir/vmlinuz boot=$dir iso-scan/filename=$f noeject noprompt splash --
+			  initrd (iso)/$dir/$initrd
 			}
 		END
 	fi
