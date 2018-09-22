@@ -379,8 +379,8 @@ then
 		! echo -e "$fdiskcmd" |fdisk "$newdevice" &&
 			Exit "Error $? partitioning after:\necho -e $fdiskcmd |fdisk $newdevice" &&
 			return 28
-		partprobe /dev/sda
 	fi
+	partprobe /dev/sda
 	force_reencrypt=1
 	device=$newdevice
 	scheme=$newscheme
