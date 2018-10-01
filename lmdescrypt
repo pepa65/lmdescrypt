@@ -570,7 +570,7 @@ mount -t proc proc /proc
 mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
-type -p localectl >/dev/null && localectl set-locale LANG=$LANG
+type -P localectl >/dev/null && localectl set-locale LANG=$LANG
 useradd -ms /bin/bash $username
 pwf=\$(mktemp) pwf2=\$(mktemp)
 chmod 600 "\$pwf" "\$pwf2"
