@@ -1,23 +1,26 @@
 #!/bin/bash
 set +o xtrace +o verbose +o errexit -o errtrace
-trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 1' INT TERM
-version=0.988
+trap 'set +o errexit; return 1' ERR
+trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 2' INT TERM
+version=0.990
 
 ############################################################################
 #
-#  lmdescrypt 0.988
+#  lmdescrypt 0.990
 #
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 or
-#  201701), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, or 19,
-#  either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
+#  201701), LMDE3 (201808), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3,
+#  19, or Ubuntu 18.04, either i686 or amd64, with MSDOS or GPT partitions,
+#  with UEFI or not.
 # The result: a fully LUKS encrypted system, with LVM2 volumes of root and
 #  swap (and optionally: data) with optional boot partition
 #  (with optional boot-from-iso-file).
 #
 # Shortlink to download the script: http://4e4.win/lmdescrypt
-# Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
+# Tutorial on Linux Mint community:
+#  https://community.linuxmint.com/tutorial/view/2265
 # Gitlab page: https://gitlab.com/pepa65/lmdescrypt
 # Questions? Email pepa65@passchier.net or post an Issue on the gitlab page.
 #
@@ -43,10 +46,8 @@ version=0.988
 ##> nano lmdescrypt
 ##
 ### 4. Make sure all the partitions mentioned in SETTINGS exist
-## For example, (re)partition the drive like this
+## For example, (re)partition the drive like this for non-UEFI
 ##  (erasing all, taking up all space):
-##
-##> swapoff -a  # unmount all automounted swap partitions
 ##
 ##> sgdisk -Zon1::+2M -t1:ef02 -c1:BIOS -n 2::-0 -t2:8e00 -c2:X -g /dev/sda
 ##
@@ -70,10 +71,10 @@ version=0.988
 ### And that's it!
 ##
 ### Installing into a pre-existing environment
-##  Using a pre-existing boot-partition, LUKS partition and LVM Logical Volumes
-##   is entirely supported.
+##  Using a pre-existing boot-partition, LUKS partition and LVM Logical
+##   Volumes is entirely supported.
 ##  Not having a separate boot partition is also supported: total encryption!
-##  Multiple booting with other OSes also works out of the box.
+##  Multiple boot setups with other OSes also works out of the box.
 ##  MBR, GPT partition tables and UEFI work according to configuration.
 ##
 ############################################################################
@@ -81,7 +82,7 @@ version=0.988
 ############################################################################
 #### SETTINGS
 ############################################################################
-### Review all settings in this section
+## Review all settings in this section
 
 ### The device to be booted (for the grub bootloader: usually a drive!):
 grub_device=/dev/sda
@@ -92,55 +93,57 @@ grub_device=/dev/sda
 ## Total encryption: boot_part should be empty
 ## UEFI setup: Must have an efi partition (type ef00) of at least 260M with a
 ##  VFAT filesystem, will be formatted if not yet formatted!
-## GPT (non-UEFI) setup: Must have a bios partition (type ef02) of at least 2M!
+## GPT non-UEFI setup: Must have a bios partition (type ef02) of at least 2M!
 ### Partitions to use:
 boot_part=
 crypt_part=/dev/sda2
 
 ## When boot_part is not set, this is ignored
 ## If the boot partition is too small, the install will fail in the end!
-### Set to 1 to include this iso as file on boot partition to boot from
+### Set to 1 to include this iso as a file on boot partition to boot from
 include_isofile=1
 
 ## When booting with total encryption, it is necessary to enter the password
 ##  twice, once for grub and once for the kernel to decrypt the LUKS partition
 ## Entering a password only once to unlock is possible by using a keyfile that
-##  is stored in the initrd file, but anyone can access it and then use it to
-##  decrypt the LUKS-encrypted partition!
-### Set to 1 to use an initrd keyfile --INSECURE!-- when doing total encryption:
+##  is stored in the initrd file, but anyone with read access to the initrd
+##  file could read it and use it to decrypt the LUKS-encrypted partition!
+### Set to 1 to use an initrd keyfile (INSECURE!) when doing total encryption:
 insecure_keyfile=0
 
-## Adjust only if you already have a LUKS encrypted partition that you want to wipe and start from scratch
-## If set to 0 and there are pre-existing volumes that need to be wiped,
-##  do it manually:
-##   cryptsetup luksOpen <crypt_part> <crypt_label>
-##   lvremove /dev/<vg_label>/<volumelabel>
-### Wipe the crypt-partition before setup, even if already set up, if 1:
+## Set to 1 only if you already have a LUKS encrypted partition that you want
+##  to wipe and start from scratch. If set to 0 and there are pre-existing
+##  volumes that you want to erase, you can do it manually:
+##>  cryptsetup luksOpen <crypt_part> <crypt_label>
+##>  lvremove /dev/<vg_label>/<volumelabel>
+### Wipe out the crypt-partition before setup, even if already set up, if 1:
 force_reencrypt=0
 
-## No strict need to adjust; only takes effect if force_reencrypt (above) is 1
-## WARNING: Putting 1 here will take a LONG time (depending on the size), let it run overnight!
+## No strict need to adjust, unless paranoid. WARNING: Putting 1 here will
+##  take a LONG time (depending on partition size) - let it run overnight!
 ### Check for bad blocks and fill with pseudorandom data if 1:
 force_random=0
 
 ## No need to adjust unless re-using existing volumes!
-## If a Volume Group or Logical Volume with this name EXISTS, IT WILL BE USED!
-## The data_label will also be the name of the mountpoint
-## If empty, the default NAME (in NAME_label) will be used
+## If a Volume Group / Logical Volume with this name EXISTS, IT WILL BE USED!
+## The data_label will also be the name of the mountpoint.
+## If empty, the default NAME (as in NAME_label) will be used.
 ### Filesystem labels (no spaces):
 boot_label=
-crypt_label=
 vg_label=
+crypt_label=
 root_label=
 swap_label=
 data_label=
 
-## Don't allot more space than available, and at least 6GB for root
-## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal points or spaces, like: 10G or 200M
+## Don't allot more space than available, and at least 6GB for root.
+## Specify lvm2 volume sizes in gigabytes (G) or megabytes (M), no decimal
+##  points or spaces, like: 10G or 200M
 ## - if empty (only for swap or data) it will NOT BE USED
-## - if EXISTING then the Logical Volume will not be created and needs to exist already
-##   (and so should the Volume Group then!)
-## - if REST (only for root or data, not both) then the rest of the available space will be used
+## - if EXISTING it will NOT be created, and then the Logical Volume needs
+##   to exist already (and so should the Volume Group then!)
+## - If REST (only for root or data, not both) then the rest of the available
+##   space will be used
 ## - DEFAULT (only for swap) means 40% of RAM size (/sys/power/image_size)
 ##   (See: https://www.kernel.org/doc/Documentation/power/interface.txt)
 ### Logical volume usage & sizes:
@@ -150,18 +153,20 @@ data_size=
 
 ## Adjust if re-using preexisting boot or data volumes!
 ## Fill in the desired filesystem-type, empty means it will NOT BE FORMATTED!
-##  (pre-existing filesystem will be kept!)
-## Supported for boot and root: btrfs ext2 ext3 ext4 reiserfs xfs; for swap: swap
-## Supported for data: btrfs ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs reiserfs vfat xfs
+##  (Pre-existing filesystem will be kept!)
+## Supported for boot and root: btrfs ext2 ext3 ext4 reiserfs xfs.
+## For swap: swap. For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs minix msdos
+##  ntfs reiserfs vfat xfs
 ### Filesystems:
 boot_fs=ext4
 root_fs=btrfs
 swap_fs=swap
 data_fs=
 
-## Adjust if you require another encryption scheme, see /proc/crypto
-## Find the speeds on your hardware by: cryptsetup benchmark (and choose accordingly)
-## The -i parameter is the number of milliseconds spend iterating on THIS system
+## Adjust if you require another encryption scheme, see /proc/crypto.
+## Find the speeds on your hardware (and choose accordingly) by:
+##> cryptsetup benchmark
+## The -i parameter is the number of milliseconds iterating on THIS system!
 ### Parameters for cryptsetup luksFormat:
 cryptopts='-s 512 -h sha512 -i 5000'
 
@@ -171,7 +176,7 @@ username=me
 hostname=mine
 
 ## Adjust according to preference; internet connection required!
-### Extra packages to be installed (in between the single quotes, seperated by space):
+### Extra packages to install (in between single quotes, seperated by space):
 packages=''
 
 ############################################################################
@@ -179,14 +184,16 @@ packages=''
 ############################################################################
 
 Echo(){ ## $1=message
-	echo -e '_______________________________________________________________________________\n'
+	echo -n '________________________________________________________________'
+	echo -e '_______________\n'
 	echo -e "  $1"
-	echo -e '_______________________________________________________________________________\n'
+	echo -n '________________________________________________________________'
+	echo -e '_______________\n'
 }
 
 ## To really exit it needs to be followed by 'return' in the main body!
 Exit(){ ## $1=message
-	Echo "  ERROR: $1\n  ABORTING"
+	Echo "ERROR: $1\n  ABORTING"
 }
 
 Warning(){ ## $1=message
@@ -195,7 +202,7 @@ Warning(){ ## $1=message
 
 Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 	case $1 in
-		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) [[ ! $4 = data ]] && return 2 ;;&
+		hfs|hfsplus|jfs|minix|msdos|vfat|ntfs) [[ ! $4 = data ]] && return 3 ;;&
 		## Continue even if the above pattern matched (unless $4 isn't data)
 		btrfs) mkfs.$1 -f -L "$2" "$3" ;;
 		ext2|ext3|ext4) mkfs.$1 -F -L "$2" "$3" ;;
@@ -207,7 +214,7 @@ Mkfs(){ ## $1=fs $2=label $3=dev $4=kind
 		ntfs) mkfs.$1 -f -F -U -L "$2" "$3" ;;
 		reiserfs) mkfs.$1 -ffl "$2" "$3" ;;
 		xfs) mkfs.$1 -f -L "$2" "$3" ;;
-		*) return 3 ;;
+		*) return 4 ;;
 	esac
 }
 
@@ -215,8 +222,8 @@ Checklabel(){ ## $1: labelname
 	label="$1_label"
 	content=$(eval "echo \$$label")
 	[[ $content ]] || eval "$label=$1"
-	[[ ! $content = ${content/ } ]] \
-			&& Exit "Label $label contains spaces: '$content'"
+	[[ ! $content = ${content/ } ]] &&
+		Exit "Label $label contains spaces: '$content'"
 }
 
 ############################################################################
@@ -226,45 +233,59 @@ Checklabel(){ ## $1: labelname
 self=$(basename $BASH_SOURCE)
 
 ## If not run interactively, don't run
-[[ $- != *i* ]] && Exit "  ERROR: This script needs to be sourced! Run it like:\n   sudo source $self\n  ABORTING" && exit 1
-((EUID)) && Exit "This script only works when run with root privileges, like:\n   sudo source $self" && return 4
+[[ $- != *i* ]] &&
+	Exit "Must be sourced! Run it like:\n   source $self" &&
+	exit 1
+((EUID)) &&
+	Exit "Must be run with root privileges, do:\n   sudo -i\n   source $self" &&
+	return 5
+
+## Set parameters from commandline
+for p in "$@"
+do
+	[[ ! $p =~ ^[a-z_][a-z0-9_]*= ]] &&
+		Exit "No variable assignment: $p" && return 6
+	q="${p/=/=\'}'"
+	! eval "$q" && Exit "Failed argument evaluation: '$p'" && return 7
+	echo "    ${q%%=*}: ${q#*=}"
+done
 
 ## Check existence of mandatory devices
 [[ ! -w "$crypt_part" ]] &&
 	Exit "Crypt device does not exist or is not writable: '$crypt_part'" &&
-	return 5
+	return 8
 [[ ! -w "$grub_device" ]] &&
 	Exit "Grub device does not exist or is not writable: '$grub_device'" &&
-	return 6
+	return 9
 
 ## Check names, labels, root_fs
 [[ ! $username =~ ^[a-z_][a-z0-9_]*$ ]] &&
-	Exit "Illegal format for username: '$username'" && return 7
+	Exit "Illegal format for username: '$username'" && return 10
 [[ ! $hostname =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$ ]] &&
-	Exit "Illegal format for hostname: '$hostname'" && return 8
-Checklabel crypt && return 9
-Checklabel vg && return 10
-Checklabel boot && return 11
-Checklabel root && return 12
-Checklabel swap && return 13
-Checklabel data && return 14
+	Exit "Illegal format for hostname: '$hostname'" && return 11
+Checklabel crypt && return 12
+Checklabel vg && return 13
+Checklabel boot && return 14
+Checklabel root && return 15
+Checklabel swap && return 16
+Checklabel data && return 17
 [[ ! $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
-	Exit "Wrong value for root_fs: '$root_fs'" && return 15
+	Exit "Wrong value for root_fs: '$root_fs'" && return 18
 
 ## Determine root and data partition usage & size
-[[ $root_size ]] && [[ ! $root_size = REST ]] && [[ ! $root_size = EXISTING ]] &&
-	[[ ! $root_size =~ [1-9][0-9]*[MG] ]] &&
-	Exit "Invalid format root_size: '$root_size'" && return 16
+[[ $root_size ]] && [[ ! $root_size = REST ]] &&
+	[[ ! $root_size = EXISTING ]] && [[ ! $root_size =~ [1-9][0-9]*[MG] ]] &&
+	Exit "Invalid format root_size: '$root_size'" && return 19
 if [[ $data_size = REST ]]
 then
 	[[ $root_size = REST ]] &&
-		Exit "Settings data_size and root_size can't both be REST" && return 17
+		Exit "Settings data_size and root_size can't both be REST" && return 20
 	lvm_data='-l 100%FREE -Zy'
 else
 	if [[ $data_size && ! $data_size = EXISTING ]]
 	then
 		[[ ! $data_size =~ [1-9][0-9]*[MG] ]] &&
-			Exit "Invalid format data_size: '$data_size'" && return 18
+			Exit "Invalid format data_size: '$data_size'" && return 21
 		lvm_data="-L $data_size -Zy"
 	fi
 fi
@@ -277,7 +298,7 @@ else
 	if [[ ! $swap_size = EXISTING ]]
 	then
 		[[ $swap_size ]] && [[ ! $swap_size =~ [1-9][0-9]*[MG] ]] &&
-			Exit "Invalid format swap_size: $swap_size" && return 19
+			Exit "Invalid format swap_size: $swap_size" && return 22
 		lvm_swap="-L $swap_size -Cy -Zy"
 	fi
 fi
@@ -290,13 +311,13 @@ then  ## GPT partition scheme
 	if [[ -e /sys/firmware/efi ]]
 	then  ## UEFI: so it is an amd64 architecture that supports UEFI
 		read n discard <<<"$(grep ' EF00  ' <<<"$gdisk" |head -1)"
-		[[ -z $n ]] && Exit "UEFI without type ef00 efi partition!" && return 20
+		[[ -z $n ]] && Exit "UEFI without type ef00 efi partition!" && return 23
 		efi_part="$grub_device$n"
 		[[ ! $(lsblk "$efi_part" -no FSTYPE) = vfat ]] &&
 			mkfs.vfat -n EFI "$efi_part"
 	else  ## non-UEFI GPT setup
 		! grep -q ' EF02  ' <<<"$gdisk" &&
-			Exit "Non-UEFI GPT setup without type ef02 bios partition" && return 21
+			Exit "Non-UEFI GPT setup without type ef02 bios partition" && return 24
 	fi
 fi
 
@@ -313,8 +334,8 @@ do
 	then
 		/lib/cryptsetup/askpass "Enter the same password again:" >"$pwf2"
 		echo
-		diff -q --label $'\b\b\b\b\b\b\b\bFirst' "$pwf" --label "second password" "$pwf2" ||
-			shred -u "$pwf"
+		diff -q --label $'\b\b\b\b\b\b\b\bFirst' "$pwf" \
+				--label "second password" "$pwf2" || shred -u "$pwf"
 		shred -u "$pwf2"
 	else
 		echo -e "Empty password not allowed\n"
@@ -342,8 +363,8 @@ fi
 crypt_dev="/dev/mapper/$crypt_label"
 [[ ! -b "$crypt_dev" ]] &&
 	! cryptsetup luksOpen "$crypt_part" $crypt_label --key-file "$pwf" &&
-	shred -u "$pwf" && Exit "Failed to open the encrypted partition $crypt_part" &&
-	return 21
+	shred -u "$pwf" &&
+		Exit "Failed to open the encrypted partition $crypt_part" && return 25
 shred -u "$pwf"
 crypt_uuid=$(blkid -s UUID -o value "$crypt_part")
 
@@ -363,7 +384,7 @@ then
 	if [[ $swap_fs ]]
 	then
 		[[ ! $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" &&
-			return 22 ||
+			return 26 ||
 			mkswap -f -L $swap_label "$swap_dev"
 	fi
 fi
@@ -374,22 +395,22 @@ fi
 if [[ $data_size ]]
 then  ## Create if it doesn't exist and format if required
 	[[ ! -h $data_dev && $data_size = EXISTING ]] &&
-		Exit "There is no existing data device $data_dev" && return 23
+		Exit "There is no existing data device $data_dev" && return 27
 		lvcreate -Wy $lvm_data -n $data_label $vg_label
 	if [[ $data_fs ]]
 	then
 		! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
 			Exit "Unsupported filesystem $data_fs for data volume $data_dev with label $data_label" &&
-			return 24
+			return 28
 	else  ## No data filesystem specified: existing or bust
 		if [[ $data_size = EXISTING ]]
 		then
 			! data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null) &&
 				Exit "No filesystem specified for data volumeand none present" &&
-				return 25
+				return 29
 		else
 			Exit "No filesystem specified for data volume"
-			return 26
+			return 30
 		fi
 	fi
 fi
@@ -399,30 +420,30 @@ if [[ $root_fs ]]
 then
 	! Mkfs "$root_fs" "$root_label" "$root_dev" root &&
 		Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" &&
-		return 27
+		return 31
 else
 	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
 	[[ -z $root_fs ]] &&
 		Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
-		return 28
+		return 32
 	[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs)$ ]] &&
-		Exit "Root partition has unsupported filesystem: $root_fs" && return 29
+		Exit "Root partition has unsupported filesystem: $root_fs" && return 33
 fi
 
 if [[ $boot_part ]]
 then
 	[[ ! $boot_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|)$ ]] &&
-		Exit "Wrong value for boot_fs: '$boot_fs'" && return 30
+		Exit "Wrong value for boot_fs: '$boot_fs'" && return 34
 	if [[ $boot_fs ]]
 	then
 		! Mkfs "$boot_fs" "$boot_label" "$boot_part" boot &&
 			Exit "Unsupported filesystem $boot_fs for boot-device $boot_part with label $boot_label" &&
-			return 31
+			return 35
 	else
 		boot_fs=$(lsblk "$boot_part" -no FSTYPE 2>/dev/null)
 		[[ -z $boot_fs ]] &&
 			Exit "Boot partition $boot_part has no filesystem, fill in 'boot_fs' (or leave boot_part empty)" &&
-			return 32
+			return 36
 	fi
 	boot_uuid=$(blkid -s UUID -o value "$boot_part")
 fi
@@ -456,17 +477,22 @@ else  ## regular Mint
 fi
 Echo "Copying the system files..."
 cp -a "$rofs"/* "$target"
-rm $target/etc/apt/sources.list .
-! grep -q 'Linux Mint 19' /etc/os-release &&
-	cp /etc/apt/sources.list $target/etc/apt/sources.list
+aptsrc="/etc/apt/sources.list"
+rm "$target/$aptsrc"
+osrelease=$(</etc/os-release)
+grep -q '^ID=ubuntu' <<<"$osrelease" && apt-add-repository universe
+! grep -q 'Linux Mint 19' <<<"$osrelease" && cp "$aptsrc" "$target/$aptsrc"
 
 ## Prepare root
 echo "proc /proc proc defaults 0 0" >"$target/etc/fstab"
 [[ $root_fs = btrfs ]] &&
 	echo "$root_dev / $root_fs defaults,compress 0 1" >>"$target/etc/fstab" ||
-	echo "$root_dev / $root_fs defaults,relatime,errors=remount-ro 0 1" >>"$target/etc/fstab"
-[[ $swap_size ]] && echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
-[[ $data_size ]] && echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
+	echo "$root_dev / $root_fs defaults,relatime,errors=remount-ro 0 1" \
+			>>"$target/etc/fstab"
+[[ $swap_size ]] &&
+	echo "$swap_dev $swap_label swap sw 0 0" >>"$target/etc/fstab"
+[[ $data_size ]] &&
+	echo "$data_dev /$data_label $data_fs relatime 0 2" >>"$target/etc/fstab"
 p3=none p4=luks
 if [[ -z $boot_part ]]
 then
@@ -533,7 +559,8 @@ mount --bind /dev "$target/dev"
 
 ## Prepare the chroot script
 inside="/root/$self.inside"
-(cat <<X
+( ## Subshell start
+cat <<X
 #!/bin/bash
 set +o verbose -o errtrace
 export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
@@ -543,7 +570,7 @@ mount -t proc proc /proc
 mount -t devpts pts /dev/pts
 pvscan --cache
 locale-gen --purge --no-archive
-type -p localectl >/dev/null && localectl set-locale LANG=$LANG
+type -P localectl >/dev/null && localectl set-locale LANG=$LANG
 useradd -ms /bin/bash $username
 pwf=\$(mktemp) pwf2=\$(mktemp)
 chmod 600 "\$pwf" "\$pwf2"
@@ -555,8 +582,8 @@ do
 	then
 		/lib/cryptsetup/askpass "Enter the same password again: " >"\$pwf2"
 		echo
-		diff -q --label \$'\b\b\b\b\b\b\b\bFirst' "\$pwf" --label "second password"	"\$pwf2" ||
-			shred -u "\$pwf"
+		diff -q --label \$'\b\b\b\b\b\b\b\bFirst' "\$pwf" \
+				--label "second password"	"\$pwf2" || shred -u "\$pwf"
 		shred "\$pwf2"
 	else
 		echo -e "Empty password not allowed\n"
@@ -575,7 +602,7 @@ then
 	mkdir /media/cdrom
 	mount /dev/sr0 /media/cdrom
 	apt-cdrom -m add -d=/media/cdrom
-	sed -i 's/^deb /deb [arch=amd64] /g' /etc/apt/sources.list
+	sed -i 's/^deb /deb [arch=amd64] /g' "$aptsrc"
 fi
 if [[ "$packages" ]]
 then
@@ -587,35 +614,40 @@ if ((lmde))
 then
 	echo "apt-get -qq purge '^live-.*'"
 	echo 'rm -rvf /lib/live'
-	echo "update-initramfs -c -k $(uname -r)"
+	echo 'update-initramfs -c -k $(uname -r)'
 fi
+efi_dir=/boot/efi
 cat <<X
-chmod 600 "/boot/initrd.img-$(uname -r)"
+chmod 600 "/boot/initrd.img-\$(uname -r)"
 if [[ "$efi_part" ]]
 then
-	efi_dir=/boot/efi
-	mkdir -p "$efi_dir/EFI/boot"
+	mkdir -p "$efi_dir"
 	mount "$efi_part" "$efi_dir"
-	DEBIAN_FRONTEND=noninteractive apt install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
-	grub-install --force --recheck --efi-directory="$efi_dir" "$grub_device"
-	grep -q '^Linux Mint 17' /etc/issue && sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
+	mkdir -p "$efi_dir/EFI/boot"
+	DEBIAN_FRONTEND=noninteractive apt install \
+			-o Dpkg::Options::="--force-confdef" \
+			-o Dpkg::Options::="--force-confold" --yes --force-yes grub-efi mokutil
+	grub-install --force --recheck --target=x86_64-efi --efi-directory="$efi_dir" "$grub_device"
+	grep -q '^Linux Mint 17' /etc/issue &&
+		sed -i 's/^quick_boot="1"/quick_boot="0"/g' /etc/grub.d/*
 	update-grub
 	cp "$efi_dir"/EFI/*/grubx64.efi "$efi_dir/EFI/boot/bootx64.efi"
 	umount "$efi_dir"
 	umount /media/cdrom
 	rmdir /media/cdrom
 else
-	update-grub
 	grub-install --force --recheck "$grub_device"
+	update-grub
 fi
-sed -i 's/^deb.* cdrom:.*/#\0/' /etc/apt/sources.list
-gconftool-2 --set /apps/gksu/sudo-mode --type bool true
+[[ -f $aptsrc ]] && sed -i 's/^deb.* cdrom:.*/#\0/' "$aptsrc"
+gconftool-2 --set /apps/gksu/sudo-mode --type bool true 2>/dev/null
 umount /dev/pts
 umount /proc
 umount /sys
 [[ -f /lvm.pid ]] && kill -9 \$(cat /lvm.pid) && rm /lvm.pid
 exit 0
 X
+## Subshell end
 ) >"$target$inside"
 chmod +x "$target$inside"
 
@@ -624,9 +656,9 @@ Echo "Finalizing settings on the install"
 chroot "$target" "$inside"
 
 [[ $(df --output=pcent $target |tail -1) = 100% ]] &&
-	Exit "The filesystem on $root_dev is 100% full" && return 33
+	Exit "The filesystem on $root_dev is 100% full" && return 37
 [[ $boot_part && $(df --output=pcent $target/boot |tail -1) = 100% ]] &&
-	Exit "The filesystem on $boot_part is 100% full" && return 34
+	Exit "The filesystem on $boot_part is 100% full" && return 38
 
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
@@ -635,11 +667,12 @@ umount "$target"
 [[ $swap_size ]] && swapoff "$swap_dev"
 sync
 sleep 1
-! vgchange -an && Exit "Not able to close all logical volumes" && return 35
+! vgchange -an && Exit "Not able to close all logical volumes" && return 39
 sync
 sleep 1
-! cryptsetup luksClose $crypt_label && Exit "Not able to cleanly close crypt" &&
-	return 36
+! cryptsetup luksClose $crypt_label &&
+	Exit "Not able to cleanly close crypt" &&
+	return 40
 sync
 
 Echo "Ready for reboot!"
