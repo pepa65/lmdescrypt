@@ -661,7 +661,7 @@ then
 		dd if=/dev/sr0 of="$target/boot/$isofile"
 		(cd "$target/boot"; ln -s "$isofile" "$isoname")
 		((lmde)) && dir=live || dir=casper
-		initrd=$(echo /cdrom/$dir/initrd.*) initrd=${initrd##*/}
+		initrd=$(echo /cdrom/$dir/initrd*) initrd=${initrd##*/}
 		sdxn=$(readlink -e "$boot_part" 2>/dev/null) || sdxn=$device
 		x=$(grep -o '/sd.' <<<"$sdxn")
 		[[ $scheme = gpt ]] && sch=gpt || sch=msdos
@@ -706,13 +706,13 @@ cat <<-END
 	#!/bin/bash
 	set +o verbose -o errtrace
 	export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-	type -p lvmetad 2>/dev/null && lvmetad -p /lvm.pid
+	type -P lvmetad 2>/dev/null && lvmetad -p /lvm.pid
 	mount -t sysfs sys /sys
 	mount -t proc proc /proc
 	mount -t devpts pts /dev/pts
 	pvscan --cache
 	locale-gen --purge --no-archive
-	type -p localectl >/dev/null && localectl set-locale LANG=$LANG
+	type -P localectl >/dev/null && localectl set-locale LANG=$LANG
 	useradd -ms /bin/bash $username
 	pwf=\$(mktemp) pwf2=\$(mktemp)
 	chmod 600 "\$pwf" "\$pwf2"
