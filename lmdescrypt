@@ -11,12 +11,12 @@ version=0.992
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 or
-#  201701), LMDE3 (201808), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3,
+#  201701), LMDE3 (201808), regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3,
 #  19, or Ubuntu 18.04, either i686 or amd64, with MSDOS or GPT partitions,
 #  with UEFI or not, with LUKS encryption or not, with ZFS or LVM2.
-# The result: a fully LUKS encrypted system (or not), with LVM2 or ZFS volumes
-#   of root and swap (and optionally: data) with optional boot partition
-#  (with optional boot-from-iso-file).
+# The result: a fully LUKS encrypted system (or not), with LVM2 or ZFS
+#  volumes of root and swap (and optionally: data) with optionally a boot
+#  partition (and with optional boot-from-iso-file).
 #
 # Shortlink to download the script: http://4e4.win/lmdescrypt
 # Tutorial on Linux Mint community:
@@ -72,45 +72,40 @@ version=0.992
 ############################################################################
 ## Review all settings in this section
 
-## When autopart is empty, partitions will need to be set up beforehand.
-## When autopart is set, the former partition layout will be WIPED OUT!
-##   Syntax: <device>:gpt|dos,<partition>[,...]  (No BIOS partition on DOS!)
-##           <partition>: efi|bios|boot|luks|lvm|zfs|none:<size>K|M|G|T|P
-##   Max. 1 efi, 1 boot, 1 of luks/lvm/zfs ('none' as many as needed)
-### Partitioning scheme
-autopart=/dev/sda:dos,efi:32M,lvm:rest
-autopart=/dev/sda:gpt,bios:1M,boot:500M,luks:rest
-autopart=/dev/sda:gpt,efi:300M,zfs:rest
-autopart=/dev/sda:gpt,efi:300M,luks:rest
-## (Only the last one takes effect!)
-
 ### The device to be booted (for the grub bootloader: usually a drive!):
 grub_device=/dev/sda
 
-## Adjust if needed (not needed if following the suggested partitioning)
+## When autopart is empty, partitions will need to be set up beforehand.
+## When autopart is set, the former partition layout will be WIPED OUT!
+##   Syntax: <device>:gpt|dos,<partition>[,...]  (No BIOS partition on DOS!)
+##     <partition>: efi|bios|boot|lukslvm|lukszfs|lvm|zfs|none:<size>K|M|G|T|P
+##   Max. 1 efi, 1 boot, 1 of lukslvm/lukszfs/lvm/zfs  (Unlimited 'none')
+## It is implicitly setting boot_part, vg_part, vg_type
+### Partitioning scheme:
+autopart=/dev/sda:dos,efi:32M,lvm:rest
+autopart=/dev/sda:gpt,bios:1M,boot:500M,lukslvm:rest
+autopart=/dev/sda:gpt,efi:300M,zfs:rest
+autopart=/dev/sda:gpt,efi:300M,lukszfs:rest
+## Only the last one takes effect! Comment them all out to not do any
+##  auto-partitioning! (And then do it manually before running this script!)
+
+## Adjust if needed (not needed when auto-partitioning)
 ## Specify the partitions you created by any valid device path, like:
-## /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
-## Total encryption: boot_part should be empty
+##  /dev/disk/by-label/...  /dev/...  /dev/disk/by-id/...
+## Total encryption: boot_part should be empty.
 ## UEFI setup: Must have an efi partition (type ef00) of at least 260M with a
 ##  VFAT filesystem, will be formatted if not yet formatted!
 ## GPT non-UEFI setup: Must have a bios partition (type ef02) of at least 2M!
-### Partitions to use:
+### Partition devices to use:
 boot_part=
 vg_part=
-## Both are IGNORED/OVERWRITTEN when autopart is set!
+## Both are IGNORED and OVERWRITTEN when autopart is set!
 
-## When boot_part is not set, this is ignored
-## The boot partition needs to be 200MB larger than the iso file!
-### Set to 1 to include this iso as a file on boot partition to boot from
-include_isofile=1
-
-## When booting with total encryption, it is necessary to enter the password
-##  twice, once for grub and once for the kernel to decrypt the LUKS partition
-## Entering a password only once to unlock is possible by using a keyfile that
-##  is stored in the initrd file, but anyone with read access to the initrd
-##  file could read it and use it to decrypt the LUKS-encrypted partition!
-### Set to 1 to use an initrd keyfile (INSECURE!) when doing total encryption:
-insecure_keyfile=0
+## Choose desired type of volumegroup: lukslvm (encrypted LVM2),
+##  lukszfs (ZFS on LUKS), zfs (zpool with ZFS) or lvm (plain LVM2)
+### Volume group type:
+vg_type=lukszfs
+## This is ignored when autopart is set!
 
 ## Set to 1 only if you already have a LUKS encrypted partition that you want
 ##  to wipe and start from scratch. If set to 0 and there are pre-existing
@@ -121,8 +116,21 @@ insecure_keyfile=0
 force_reencrypt=0
 ## If autopart is set, this is automatically set to 1 (always re-encrypt)
 
-## No strict need to adjust, unless paranoid. WARNING: Putting 1 here will
-##  take a LONG time (depending on partition size) - let it run overnight!
+## When boot_part is not set, this is ignored.
+## The boot partition needs to be 200MB larger than the iso file!
+### Set to 1 to include this iso as a file on boot partition to boot from:
+include_isofile=1
+
+## When booting with total encryption, the password must be entered twice,
+##  once for grub and once for the kernel to decrypt the LUKS partition.
+## By using a keyfile that is stored in the initrd file, it is possible to
+##  boot after entering the password just once, but anyone with read access to
+##  the initrd file could use it to gain access the LUKS-encrypted partition!
+### Set to 1 to use an initrd keyfile (INSECURE!) when doing total encryption:
+insecure_keyfile=0
+
+## No strict need to adjust, but often recommended. Putting 1 here can take
+##  really long (depending on partition size and drive speed). Run overnight!
 ### Check for bad blocks and fill with pseudorandom data if 1:
 force_random=0
 
@@ -137,8 +145,9 @@ swap_label=
 data_label=
 vg_label=
 crypt_label=
-## crypt_label is only used with LUKS, vg_label either with ZFS or LVM2.
+## crypt_label is used with LUKS, vg_label with ZFS or LVM2.
 
+## Size is irrelevant for (luks)zfs, but the volume will NOT BE MADE if EMPTY!
 ## Don't allot more space than available, and at least 6GB for root.
 ## Specify volume sizes in gigabytes (G) or megabytes (M), no decimal
 ##  points or spaces, like: 10G or 200M
@@ -153,20 +162,21 @@ crypt_label=
 root_size=REST
 swap_size=DEFAULT
 data_size=
+## Values are ignored for (luks)zfs, but empty means it will not be created!
 
 ## Adjust if re-using preexisting boot or data volumes!
 ## Fill in the desired filesystem-type, empty means it will NOT BE FORMATTED!
-##  (Pre-existing filesystem will be kept!)
+##  (Pre-existing filesystem will be kept!) Usage depends on _size (above).
 ## Supported for boot & root: btrfs ext2 ext3 ext4 reiserfs xfs zfs.
-## Supported for swap: swap.  For data: btrfs ext2 ext3 ext4 hfs hfsplus jfs
-##  minix msdos ntfs reiserfs vfat xfs zfs.
+## Supported for data: btrfs ext2 ext3 ext4 hfs hfsplus jfs minix msdos ntfs
+##  reiserfs vfat xfs zfs.
 ## Linux Mint 17 does not come with btrfs, needs to be downloaded!
 ### Filesystems:
 boot_fs=ext4
 root_fs=btrfs
-swap_fs=swap
 data_fs=
-## If zfs is used anywhere here, the volume group will be zfs (luks or not)
+## If vg_type is lukszfs or zfs, root_fs and data_fs will be in a zpool on zfs
+##  and the setting here will be ignored!
 
 ## Adjust if you require another encryption scheme, see /proc/crypto.
 ## Find the speeds on your hardware (and choose accordingly) by:
@@ -175,7 +185,7 @@ data_fs=
 ### Parameters for cryptsetup luksFormat:
 cryptopts='-s 512 -h sha512 -i 5000'
 
-## Adjust according to preference
+## Adjust according to preference.
 ### Username and hostname (no spaces):
 username=me
 hostname=mine
@@ -247,7 +257,7 @@ self=$(basename $BASH_SOURCE)
 	return 3
 
 ## Set parameters from commandline
-for p in "$@"
+for p
 do
 	[[ ! $p =~ ^[a-z_][a-z0-9_]*= ]] &&
 		Exit "No variable assignment: $p" &&
@@ -281,7 +291,8 @@ then
 	wy= lm17=y
 	[[ $root_fs$boot_fs$data_fs == *btrfs* ]] &&
 		echo "Linux Mint 17 does not support btrfs, trying to fetch & install" &&
-		! apt-get install btrfs-tools && Exit "Failed to fetch btrfs-tools" &&
+		! apt-get update && ! apt-get install btrfs-tools &&
+		Exit "Failed to fetch btrfs-tools" &&
 		return 15
 fi
 
@@ -311,7 +322,7 @@ then
 	fi
 	Echo "Auto-partitioning $newdevice with ${newscheme^^} scheme"
 	fdiskcmd="o\n" sgdiskcmd=("sgdisk" "-Zo")
-	size= n=1 boot_part= vg_part= efi_part= bios=
+	size= n=1 boot_part= vg_part= vg_type= efi_part= bios=
 	while [[ $parts ]]
 	do
 		[[ $size = rest ]] &&
@@ -322,11 +333,11 @@ then
 			Exit "Unknown partition type: $part" &&
 			return 19
 		case $part in
-		luks|lvm|zfs)
+		lukslvm|lukszfs|lvm|zfs)
 			[[ $vg_part ]] &&
 				Exit "More than 1 partition of type luks/lvm/zfs" &&
 				return 20
-			vg_part=$newdevice$n ;;
+			vg_part=$newdevice$n vg_type=$part ;;
 		boot)
 			[[ $boot_part ]] && Exit "Only 1 boot partition allowed" &&
 				return 21
@@ -452,114 +463,143 @@ fi
 
 Echo "$self $version\n  Install Linux Mint with LUKS encryption"
 
-## Encrypt
-pwf=$(mktemp) pwf2=$(mktemp)
-chmod 600 "$pwf" "$pwf2"
-while [[ ! -s "$pwf" ]]
-do
-	/lib/cryptsetup/askpass "Enter encryption password:" >"$pwf"
-	echo
-	if [[ -s "$pwf" ]]
-	then
-		/lib/cryptsetup/askpass "Enter the same password again:" >"$pwf2"
+if [[ ${vg_type:0:4} = luks ]]
+then
+	## Encrypt
+	pwf=$(mktemp) pwf2=$(mktemp)
+	chmod 600 "$pwf" "$pwf2"
+	while [[ ! -s "$pwf" ]]
+	do
+		/lib/cryptsetup/askpass "Enter encryption password:" >"$pwf"
 		echo
-		diff -q --label $'\b\b\b\b\b\b\b\bFirst' "$pwf" \
-				--label "second password" "$pwf2" || shred -u "$pwf"
-		shred -u "$pwf2"
-	else
-		echo -e "Empty password not allowed\n"
-	fi
-done
-
-if ((force_reencrypt))
-then
-	((force_random)) && badblocks -c 10240 -s -w -t random -v "$vg_part"
-	cryptsetup luksFormat $cryptopts "$vg_part" --key-file "$pwf"
-else
-	cryptsetup isLuks "$vg_part" &&
-		Warning "$vg_part is already formatted, reencryption not forced" ||
-		cryptsetup luksFormat $cryptopts "$vg_part" --key-file "$pwf"
-fi
-
-if [[ -z $boot_part ]] && ((insecure_keyfile))
-then
-	key=crypto_keyfile.bin
-	dd bs=512 count=4 if=/dev/urandom of="/root/$key"
-	cryptsetup luksAddKey "$vg_part" "/root/$key" --key-file "$pwf"
-fi
-
-## Decrypt if not yet mapped
-crypt_dev="/dev/mapper/$crypt_label"
-[[ ! -b "$crypt_dev" ]] &&
-	! cryptsetup luksOpen "$vg_part" $crypt_label --key-file "$pwf" &&
-	shred -u "$pwf" &&
-		Exit "Failed to open the encrypted partition $vg_part" &&
-		return 38
-shred -u "$pwf"
-crypt_uuid=$(blkid -s UUID -o value "$vg_part")
-
-## Make lvm2 volumes if not there yet and make filesystems if wanted
-vgchange -ay
-vg_dev="/dev/mapper/$vg_label"
-[[ "  $vg_label" = "$(vgs --noheadings -o vg_name)" ]] ||
-	vgcreate -Zy $vg_label $crypt_dev
-root_dev="/dev/$vg_label/$root_label"
-data_dev="/dev/$vg_label/$data_label"
-swap_dev="/dev/$vg_label/$swap_label"
-
-## Create & format swap if wanted
-if [[ $swap_size ]]
-then
-	[[ ! -h $swap_dev ]] && lvcreate $wy $lvm_swap -n $swap_label $vg_label
-	if [[ $swap_fs ]]
-	then
-		[[ ! $swap_fs = swap ]] && Exit "Wrong value for swap_fs: '$swap_fs'" &&
-			return 38 ||
-			mkswap -f -L $swap_label "$swap_dev"
-	fi
-fi
-
-## Create and format root partition, and data partition if wanted
-[[ ! $root_size = REST ]] && [[ ! -h $root_dev ]] &&
-	lvcreate $wy -L $root_size -Zy -n $root_label $vg_label
-if [[ $data_size ]]
-then  ## Create if it doesn't exist and format if required
-	[[ ! -h $data_dev && $data_size = EXISTING ]] &&
-		Exit "There is no existing data device $data_dev" &&
-		return 39
-	lvcreate $wy $lvm_data -n $data_label $vg_label
-	if [[ $data_fs ]]
-	then
-		! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
-			Exit "Unsupported filesystem $data_fs for data volume $data_dev with label $data_label" &&
-			return 40
-	else  ## No data filesystem specified: existing or bust
-		if [[ $data_size = EXISTING ]]
+		if [[ -s "$pwf" ]]
 		then
-			! data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null) &&
-				Exit "No filesystem specified for data volumeand none present" &&
-				return 41
+			/lib/cryptsetup/askpass "Enter the same password again:" >"$pwf2"
+			echo
+			diff -q --label $'\b\b\b\b\b\b\b\bFirst' "$pwf" \
+					--label "second password" "$pwf2" || shred -u "$pwf"
+			shred -u "$pwf2"
 		else
-			Exit "No filesystem specified for data volume"
-			return 42
+			echo -e "Empty password not allowed\n"
+		fi
+	done
+
+	if ((force_reencrypt))
+	then
+		((force_random)) && badblocks -c 10240 -s -w -t random -v "$vg_part"
+		cryptsetup luksFormat $cryptopts "$vg_part" --key-file "$pwf"
+	else
+		cryptsetup isLuks "$vg_part" &&
+			Warning "$vg_part is already formatted, reencryption not forced" ||
+			cryptsetup luksFormat $cryptopts "$vg_part" --key-file "$pwf"
+	fi
+
+	if [[ -z $boot_part ]] && ((insecure_keyfile))
+	then
+		key=crypto_keyfile.bin
+		dd bs=512 count=4 if=/dev/urandom of="/root/$key"
+		cryptsetup luksAddKey "$vg_part" "/root/$key" --key-file "$pwf"
+	fi
+
+	## Decrypt if not yet mapped
+	crypt_dev="/dev/mapper/$crypt_label"
+	[[ ! -b "$crypt_dev" ]] &&
+		! cryptsetup luksOpen "$vg_part" $crypt_label --key-file "$pwf" &&
+		shred -u "$pwf" &&
+			Exit "Failed to open the encrypted partition $vg_part" &&
+			return 38
+	shred -u "$pwf"
+	crypt_uuid=$(blkid -s UUID -o value "$vg_part")
+fi
+
+if [[ ${vg_type: -3:3} = zfs ]] && packages+="zfs-initramfs " &&
+	apt-get update && apt-get install --yes zfs-initramfs
+then
+	zfs list $vg_label &>/dev/null && zpool export $vg_label
+	if zpool import -R $target $vg_label &>/dev/null
+	then
+		echo "Reusing zpool $vg_label with all its present filesystems!"
+		zfs set canmount=on $vg_label/ROOT/$root_label &&
+			zpool export $vg_label &&
+			zpool import -R $target $vg_label
+	else
+		echo "Creating new zpool $vg_label"
+		[[ $vg_type = lukszfs ]] && dev=$crypt_dev || dev=$vg_part
+		zpool create -f -o ashift=12 -O atime=off -O canmount=off \
+				-O compression=lz4 -O normalization=formD -O xattr=sa \
+				-O mountpoint=/ -R $target $vg_label $dev
+		zfs create -o canmount=off -o mountpoint=none $vg_label/ROOT
+		zfs create -o canmount=noauto -o mountpoint=/ $vg_label/ROOT/$root_label
+		zfs mount $vg_label/ROOT/$root_label
+		root_dev=/dev/zvol/$vg_label/$root_label
+		[[ $data_size ]] && data_dev=/dev/zvol/$vg_label/$data_label &&
+			zfs create -o setuid=off $vg_label/$data_label &&
+			zfs create -o mountpoint=/root $vg_label/ROOT/$data_label
+		[[ $swap_size ]] && swap_dev=/dev/zvol/$vg_label/$swap_label &&
+			zfs create -p -V $swap_size -b $(getconf PAGESIZE) \
+					-o compression=zle -o logbias=throughput -o sync=always \
+					-o primarycache=metadata -o secondarycache=none \
+					-ocom.sun:auto-snapshot=false $vg_label/$swap_label
+	fi
+else
+	## Make lvm2 volumes if not there yet and make filesystems if wanted
+	vgchange -ay
+	vg_dev="/dev/mapper/$vg_label"
+	[[ "  $vg_label" = "$(vgs --noheadings -o vg_name)" ]] ||
+		vgcreate -Zy $vg_label $crypt_dev
+	root_dev="/dev/$vg_label/$root_label"
+	data_dev="/dev/$vg_label/$data_label"
+	swap_dev="/dev/$vg_label/$swap_label"
+
+	## Create & format swap if wanted
+	if [[ $swap_size ]]
+	then
+		[[ ! -h $swap_dev ]] && lvcreate $wy $lvm_swap -n $swap_label $vg_label
+		mkswap -f -L $swap_label "$swap_dev"
+	fi
+
+	## Create and format root partition, and data partition if wanted
+	[[ ! $root_size = REST ]] && [[ ! -h $root_dev ]] &&
+		lvcreate $wy -L $root_size -Zy -n $root_label $vg_label
+	if [[ $data_size ]]
+	then  ## Create if it doesn't exist and format if required
+		[[ ! -h $data_dev && $data_size = EXISTING ]] &&
+			Exit "There is no existing data device $data_dev" &&
+			return 39
+		lvcreate $wy $lvm_data -n $data_label $vg_label
+		if [[ $data_fs ]]
+		then
+			! Mkfs "$data_fs" "$data_label" "$data_dev" data &&
+				Exit "Unsupported filesystem $data_fs for data volume $data_dev with label $data_label" &&
+				return 40
+		else  ## No data filesystem specified: existing or bust
+			if [[ $data_size = EXISTING ]]
+			then
+				! data_fs=$(lsblk "$data_dev" -no FSTYPE 2>/dev/null) &&
+					Exit "No filesystem specified for data volumeand none present" &&
+					return 41
+			else
+				Exit "No filesystem specified for data volume"
+				return 42
+			fi
 		fi
 	fi
-fi
-[[ $root_size = REST ]] && [[ ! -h $root_dev ]] &&
-	lvcreate $wy -l 100%FREE -Zy -n $root_label $vg_label
-if [[ $root_fs ]]
-then
-	! Mkfs "$root_fs" "$root_label" "$root_dev" root &&
-		Exit "Unsupported filesystem $root_fs for root-device $root_dev with label $root_label" &&
-		return 43
-else
-	root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
-	[[ -z $root_fs ]] &&
-		Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
-		return 44
-	[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|zfs|)$ ]] &&
-		Exit "Root partition has unsupported filesystem: $root_fs" &&
-		return 45
+	[[ $root_size = REST ]] && [[ ! -h $root_dev ]] &&
+		lvcreate $wy -l 100%FREE -Zy -n $root_label $vg_label
+	if [[ $root_fs ]]
+	then
+		! Mkfs "$root_fs" "$root_label" "$root_dev" root &&
+			Exit "Unsupported filesystem $root_fs for root-device $root_dev with label	 $root_label" &&
+			return 43
+	else
+		root_fs=$(lsblk "$root_dev" -no FSTYPE 2>/dev/null)
+		[[ -z $root_fs ]] &&
+			Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
+			return 44
+		[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs|zfs|)$ ]] &&
+			Exit "Root partition has unsupported filesystem: $root_fs" &&
+			return 45
+	fi
 fi
 
 if [[ $boot_part ]]
@@ -706,7 +746,7 @@ cat <<-END
 	#!/bin/bash
 	set +o verbose -o errtrace
 	export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-	type -P lvmetad 2>/dev/null && lvmetad -p /lvm.pid
+	#type -P lvmetad 2>/dev/null && lvmetad -p /lvm.pid
 	mount -t sysfs sys /sys
 	mount -t proc proc /proc
 	mount -t devpts pts /dev/pts
@@ -751,7 +791,7 @@ fi
 
 if [[ $packages ]]
 then
-	((uefi)) || echo 'apt-get update'
+	echo 'apt-get update'
 	echo "apt-get --yes install $packages"
 fi
 
@@ -792,7 +832,7 @@ cat <<-END
 	umount /dev/pts
 	umount /proc
 	umount /sys
-	[[ -f /lvm.pid ]] && kill -9 \$(cat /lvm.pid) && rm /lvm.pid
+	#[[ -f /lvm.pid ]] && kill -9 \$(cat /lvm.pid) && rm /lvm.pid
 	exit 0
 END
 

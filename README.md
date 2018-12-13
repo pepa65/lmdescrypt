@@ -14,7 +14,7 @@ swap (and optionally: data) with optional boot partition
 * Download shortlink for the script: http://4e4.win/lmdescrypt
 * Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
 * Gitlab page: https://gitlab.com/pepa65/lmdescrypt
-* Questions?  solusos@passchier.net or post an Issue on the gitlab page
+* Questions?  pepa65@passchier.net or post an Issue on the gitlab page
 
 ## INSTRUCTIONS
 
