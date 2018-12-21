@@ -2,7 +2,7 @@
 ### version 0.990
 
 This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 and
-201701), LMDE3, or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, or 19,
+201701), LMDE3, or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, 19, 19.1,
 either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
 The result:
 
