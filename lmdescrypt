@@ -426,7 +426,7 @@ else
 	[[ -z $root_fs ]] &&
 		Exit "Root volume is not has no filesystem, fill in 'root_fs'" &&
 		return 32
-	[[ $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs)$ ]] &&
+	[[ ! $root_fs =~ ^(btrfs|ext2|ext3|ext4|reiserfs|xfs)$ ]] &&
 		Exit "Root partition has unsupported filesystem: $root_fs" && return 33
 fi
 
@@ -564,7 +564,7 @@ cat <<X
 #!/bin/bash
 set +o verbose -o errtrace
 export PS1='\[\033[01;33m\]\w \[\033[01;32m\]\$ \[\033[00m\]'
-hash -l lvmetad && lvmetad -p /lvm.pid
+#hash -l lvmetad && lvmetad -p /lvm.pid
 mount -t sysfs sys /sys
 mount -t proc proc /proc
 mount -t devpts pts /dev/pts
@@ -600,7 +600,8 @@ dpkg-reconfigure keyboard-configuration 2>/dev/null
 if [[ "$efi_part" ]]
 then
 	mkdir /media/cdrom
-	mount /dev/sr0 /media/cdrom
+	mdev=$(grep ' iso9660 ' /proc/mounts)
+	mount "${mdev%% *}" /media/cdrom
 	apt-cdrom -m add -d=/media/cdrom
 	sed -i 's/^deb /deb [arch=amd64] /g' "$aptsrc"
 fi
