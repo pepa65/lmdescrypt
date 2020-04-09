@@ -168,7 +168,7 @@ data_fs=
 ##> cryptsetup benchmark
 ## The -i parameter is the number of milliseconds iterating on THIS system!
 ### Parameters for cryptsetup luksFormat:
-cryptopts='-s 512 -h sha512 -i 5000'
+cryptopts='-s 512 -h sha512 -i 5000 --type luks1'
 
 ## Adjust according to preference
 ### Username and hostname (no spaces):
@@ -470,7 +470,7 @@ rofslm='/rofs'
 lmde=0 lmde4=0
 if [[ -d /lib/live ]]
 then  ## Debian Edition
-	[[ -h $rofsde/vmlinuz ]] && lmde4=1 cryptopts+=' --type luks1'
+	[[ -h $rofsde/vmlinuz ]] && lmde4=1
 	lmde=1
 	rofs=$rofsde
 else  ## regular Mint
