@@ -168,7 +168,7 @@ data_fs=
 ##> cryptsetup benchmark
 ## The -i parameter is the number of milliseconds iterating on THIS system!
 ### Parameters for cryptsetup luksFormat:
-cryptopts='-s 512 -h sha512 -i 5000 --type luks1'
+cryptopts='-s 512 -h sha512 -i 5000'
 
 ## Adjust according to preference
 ### Username and hostname (no spaces):
@@ -470,7 +470,7 @@ rofslm='/rofs'
 lmde=0 lmde4=0
 if [[ -d /lib/live ]]
 then  ## Debian Edition
-	[[ -h $rofsde/vmlinuz ]] && lmde4=1
+	[[ -h $rofsde/vmlinuz ]] && lmde4=1 cryptopts+=' --type luks1'
 	lmde=1
 	rofs=$rofsde
 else  ## regular Mint
@@ -556,7 +556,7 @@ cryptsetup luksHeaderBackup --header-backup-file "$target/root/$crypt_label.luks
 chmod 400 "$target/root/$crypt_label.luksHeaderBackup"
 cp "$(readlink -e $BASH_SOURCE)" "$target/root/$self"
 if ((lmde4))
-then cp "$rofs"/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
+then cp /run/live/medium/live/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
 else ((lmde)) &&
 	cp /lib/live/mount/medium/live/vmlinuz "$target/boot/vmlinuz-$(uname -r)" ||
 	cp /cdrom/casper/vmlinuz "$target/boot/vmlinuz-$(uname -r)"
