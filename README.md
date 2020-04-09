@@ -1,15 +1,13 @@
 # lmdescrypt
-### version 0.990
+**version 0.991**
 
-This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 and
-201701), LMDE3, or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3, 19, 19.1,
-either i686 or amd64, whether with MSDOS or GPT partitions, UEFI or not.
-The result:
-
-**a fully LUKS encrypted system, with LVM2 volumes of root and
+* **Funtion**: This script installs Linux Mint Debian Edition (201403), LMDE2
+(201503 or 201701), LMDE3 (201808), LMDE4 (202004) or regular Linux Mint 17,
+17.1/2/3, 18, 18.1/2/3, 19, 20, or Ubuntu 18.04, either i686 or amd64, with
+MSDOS or GPT partitions, with UEFI or not.
+* **Result**: a fully LUKS encrypted system, with LVM2 volumes of root and
 swap (and optionally: data) with optional boot partition
-(with optional boot-from-iso-file too).**
-
+(with optional boot-from-iso-file).
 * Download shortlink for the script: http://4e4.win/lmdescrypt
 * Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
 * Gitlab page: https://gitlab.com/pepa65/lmdescrypt

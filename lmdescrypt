@@ -2,18 +2,18 @@
 set +o xtrace +o verbose +o errexit -o errtrace
 trap 'set +o errexit; return 1' ERR
 trap 'set +o xtrace +o verbose +o errexit +o errtrace; return 2' INT TERM
-version=0.990
+version=0.991
 
 ############################################################################
 #
-#  lmdescrypt 0.990
+#  lmdescrypt 0.991
 #
 # Download shortlinks: https://4e4.win/lm or http://j.mp/lmdescrypt
 #
 # This script installs Linux Mint Debian Edition (201403), LMDE2 (201503 or
-#  201701), LMDE3 (201808), or regular Linux Mint 17, 17.1/2/3, 18, 18.1/2/3,
-#  19, or Ubuntu 18.04, either i686 or amd64, with MSDOS or GPT partitions,
-#  with UEFI or not.
+#  201701), LMDE3 (201808), LMDE4 (202004) or regular Linux Mint 17, 17.1/2/3,
+#  18, 18.1/2/3, 19, 20, or Ubuntu 18.04, either i686 or amd64, with MSDOS or
+#  GPT partitions, with UEFI or not.
 # The result: a fully LUKS encrypted system, with LVM2 volumes of root and
 #  swap (and optionally: data) with optional boot partition
 #  (with optional boot-from-iso-file).
@@ -159,7 +159,7 @@ data_size=
 ##  ntfs reiserfs vfat xfs
 ### Filesystems:
 boot_fs=ext4
-root_fs=btrfs
+root_fs=ext4
 swap_fs=swap
 data_fs=
 
@@ -168,7 +168,7 @@ data_fs=
 ##> cryptsetup benchmark
 ## The -i parameter is the number of milliseconds iterating on THIS system!
 ### Parameters for cryptsetup luksFormat:
-cryptopts='-s 512 -h sha512 -i 5000'
+cryptopts='-s 512 -h sha512 -i 5000 --type luks1'
 
 ## Adjust according to preference
 ### Username and hostname (no spaces):
@@ -543,6 +543,8 @@ echo "$crypt_label UUID=$crypt_uuid $p3 $p4" >"$target/etc/crypttab"
 sed "s/mint/$hostname/g" /etc/hosts >"$target/etc/hosts"
 echo $hostname >"$target/etc/hostname"
 echo "$LANG UTF-8" >>"$target/etc/locale.gen"
+mv "$target/etc/lvm/lvm.conf" "$target/etc/lvm.conf_orig"
+echo -e "devices {\n  multipath_component_detection = 0\n  md_component_detection = 0\n}\n\nactivation {\n  udev_sync = 0\n  udev_rules = 0\n}\n" >"$target/etc/lvm/lvm.conf"
 mdm=/etc/mdm/mdm.conf
 ldm=/etc/lightdm/lightdm.conf
 [[ -f $mdm ]] && dm=$mdm || dm=$ldm
@@ -661,6 +663,7 @@ chroot "$target" "$inside"
 [[ $boot_part && $(df --output=pcent $target/boot |tail -1) = 100% ]] &&
 	Exit "The filesystem on $boot_part is 100% full" && return 38
 
+mv "$target/etc/lvm.conf_orig" "$target/etc/lvm/lvm.conf"
 umount "$target/dev"
 [[ $boot_part ]] && umount "$target/boot"
 [[ $data_size ]] && umount "$target/$data_label"
