@@ -8,7 +8,7 @@ swapdev=${swapdev#/} swapdev=${swapdev#dev/}
 swapid=$(ls -l /dev/disk/by-id |grep "/$swapdev$" |head -1 |cut -d' ' -f9)
 [[ -z $swapid ]] && echo "No swap device mounted or given" && exit 1
 id=/dev/disk/by-id/$swapid
-sudo swapoff /dev/$swapdev || :
+sudo swapoff /dev/$swapdev
 
 echo -e "\n=== Encrypting non-encrypted swap partition ===\n"
 
@@ -30,7 +30,7 @@ grep -q "^$add" /etc/fstab ||
 
 # Append line to crypttab
 add="swap $id /dev/urandom swap,cipher=aes-xts-plain64:sha256,size=512"
-grep -q "^$add" /etc/crypttab ||
+[[ -f /etc/crypttab ]] && ! grep -q "^$add" /etc/crypttab &&
 	echo "$add" |sudo tee -a /etc/crypttab
 
 echo "Reboot recommended to start using encrypted swap"

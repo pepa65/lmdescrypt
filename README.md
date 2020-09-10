@@ -4,8 +4,8 @@
  - Boot into a Ubuntu/Linuxmint Desktop installer.
  - In a terminal, download the script: `wget 4e4.win/modubi`.
  - Run the script: `bash modubi`, this will start up Ubiquity.
- - In the 'Installation type' screen slecte 'Erase whole disk'.
- - Click 'Advanced features...' and then 'EXPERIMENTAL: use ZFS file system'.
+ - In the 'Installation type' screen choose 'Erase whole disk' and then click
+   on 'Advanced features...' and then 'EXPERIMENTAL: Erase disk and use ZFS'.
  - Reboot into the new install.
  - Download the script to encrypt the swap partition: `wget 4e4.win/encswap`.
  - Run the script: `bash encswap`.

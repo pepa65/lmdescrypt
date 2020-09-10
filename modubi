@@ -8,8 +8,9 @@ cat <<-EOM
 
 	=== Modifying the Ubiquity installer to use Encrypted ZFS ===
 
-	Once the graphical installer lauches, pick 'Advanced features...' in the
-	'Installation type' screen and then pick 'EXPERIMENTAL: use ZFS file system'.
+	Once the graphical installer lauches, on the 'Installation type' screen
+	choose 'Erase whole disk' and click on 'Advanced features...' and then
+	pick 'EXPERIMENTAL: Erase disk and use ZFS'.
 
 	The swap partition must also get encrypted on every boot!
 	This can be done after booting for the first time into the new system,
