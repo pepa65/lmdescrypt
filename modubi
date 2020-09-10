@@ -4,29 +4,46 @@
 modified=/usr/share/ubiquity/zsys-setup
 [[ ! -f $modified ]] && echo "Ubiquity not present" && exit 1
 
-echo -e "\n=== Modifying the Ubiquity installer to use Encrypted ZFS ===\n"
-echo "Once the graphical installer lauches, pick 'Advanced options' in the"
-echo -e " 'Installation' screen and then choose the 'ZFS' option.\n"
-echo "The swap partition must also get encrypted on every boot!"
-echo "This can be done after booting for the first time into the new system."
-echo "The script at https://4e4.win/encswap can be used to do this:"
-echo -e "\n  wget 4e4.win/encswap\n  bash encswap\n"
+cat <<-EOM
+
+	=== Modifying the Ubiquity installer to use Encrypted ZFS ===
+
+	Once the graphical installer lauches, pick 'Advanced features...' in the
+	'Installation type' screen and then pick 'EXPERIMENTAL: use ZFS file system'.
+
+	The swap partition must also get encrypted on every boot!
+	This can be done after booting for the first time into the new system,
+	the script at https://4e4.win/encswap can be used to do this:
+
+	  wget 4e4.win/encswap
+	  bash encswap
+
+EOM
 
 # Ask for the passphrase to be used
-read -rp "New passphrase to be used to decrypt the drive [Ctrl-C aborts]: "
+while [[ -z $pw ]]
+do echo "Set the passphase to encrypt the drive with."
+	read -rsp "Enter the New passphrase [empty to abort]: "
+	[[ $REPLY ]] || exit 2
+	pw=$REPLY
+	read -rsp "Confirm the passphrase [empty to abort]: "
+	[[ $REPLY ]] || exit 3
+	[[ $pw = $REPLY ]] || pw=
+done
 
 # Install the packages for Ubiquity to offer ZFS
-echo "Installing the required packages for ZFS"
 sudo apt install libzfs2linux zfs-initramfs zfsutils-linux zfs-zed
 
 # Echo the password into the 'zpool create' command
-add="\\\techo '$REPLY' |"
-sudo sed -i "/# rpool$/a $add" "$modified"
+add="\\\techo '$pw' |"
+grep -q '|$' "$modified" ||
+	sudo sed -i "/# rpool$/a $add" "$modified"
 
 # Add the options to use the password on stdin
 add='\\t\t-O encryption=aes-256-gcm \\'
 add+='\n\t\t-O keylocation=prompt \\'
 add+='\n\t\t-O keyformat=passphrase \\'
-sudo sed -i "/-O mountpoint=\/ -R /i $add" "$modified"
+grep -q keyformat=passphrase "$modified" ||
+	sudo sed -i "/-O mountpoint=\/ -R /i $add" "$modified"
 
-ubiquity &
+exec ubiquity gtk_ui

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -e
 # encswap - Set up encryption on a non-encrypted swap partition
 # Usage: encswap [<swapdevice>]
 # Required: mount(swapon swapoff) coreutils(ls head) grep sed wget apt patch
@@ -17,16 +16,21 @@ sudo apt install cryptsetup
 
 # Patch systemd for Encrypted ZFS
 patch=launchpadlibrarian.net/478315221/2150-fix-systemd-dependency-loops.patch
-wget "https://$patch" |sed "s@/etc@/lib@; s@\.in$@@" |(cd /; sudo patch -p1)
+file1=/lib/systemd/system-generators/zfs-mount-generator
+[[ -f $file1 ]] && ! grep -q 'zpool list -H -o name' "$file1" &&
+	wget -qO- "https://$patch" |sed -e 's@/etc@/lib@' -e 's@\.in$@@' |
+		(cd /; sudo patch -p1)
 
 # Comment-out current swap line in /etc/fstab and append new one
 sudo sed -i "/^\/dev\/$swapdev /s/^/#/g" /etc/fstab
 sudo sed -i "/^${id//\//\\/} /s/^/#/g" /etc/fstab
 add="/dev/mapper/swap encswap swap defaults 0 0"
-echo "$add" |sudo tee -a /etc/fstab
+grep -q "^$add" /etc/fstab ||
+	echo "$add" |sudo tee -a /etc/fstab
 
 # Append line to crypttab
 add="swap $id /dev/urandom swap,cipher=aes-xts-plain64:sha256,size=512"
-echo "$add" |sudo tee -a /etc/crypttab
+grep -q "^$add" /etc/crypttab ||
+	echo "$add" |sudo tee -a /etc/crypttab
 
 echo "Reboot recommended to start using encrypted swap"
