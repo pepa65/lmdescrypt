@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e
 # encswap - Set up encryption on a non-encrypted swap partition
 # Usage: encswap [<swapdevice>]
 # Required: mount(swapon swapoff) coreutils(ls head) grep sed wget apt patch
@@ -8,7 +9,7 @@ swapdev=${swapdev#/} swapdev=${swapdev#dev/}
 swapid=$(ls -l /dev/disk/by-id |grep "/$swapdev$" |head -1 |cut -d' ' -f9)
 [[ -z $swapid ]] && echo "No swap device mounted or given" && exit 1
 id=/dev/disk/by-id/$swapid
-sudo swapoff /dev/$swapdev
+sudo swapoff /dev/$swapdev || :
 
 echo -e "\n=== Encrypting non-encrypted swap partition ===\n"
 
@@ -19,8 +20,8 @@ patch=launchpadlibrarian.net/478315221/2150-fix-systemd-dependency-loops.patch
 wget "https://$patch" |sed "s@/etc@/lib@; s@\.in$@@" |(cd /; sudo patch -p1)
 
 # Comment-out current swap line in /etc/fstab and append new one
-sudo sed -i "/^\/dev\/$swapdev /s/^/#/g' /dev/fstab
-sudo sed -i "/^$id /s/^/#/g" /dev/fstab
+sudo sed -i "/^\/dev\/$swapdev /s/^/#/g" /etc/fstab
+sudo sed -i "/^$id /s/^/#/g" /etc/fstab
 add="/dev/mapper/swap encswap swap defaults 0 0"
 echo "$add" |sudo tee -a /etc/fstab
 
