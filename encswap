@@ -20,7 +20,7 @@ wget "https://$patch" |sed "s@/etc@/lib@; s@\.in$@@" |(cd /; sudo patch -p1)
 
 # Comment-out current swap line in /etc/fstab and append new one
 sudo sed -i "/^\/dev\/$swapdev /s/^/#/g' /dev/fstab
-sudo sed -i "/^$id /s/^/#/g' /dev/fstab
+sudo sed -i "/^$id /s/^/#/g" /dev/fstab
 add="/dev/mapper/swap encswap swap defaults 0 0"
 echo "$add" |sudo tee -a /etc/fstab
 
