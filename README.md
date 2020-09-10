@@ -1,14 +1,38 @@
+# modubi / encswap
+**Run a modified Ubiquity installer to use encrypted ZFS**
+* Usage:
+ - Boot into a Ubuntu/Linuxmint Desktop installer.
+ - In a terminal, download the script: `wget 4e4.win/modubi`.
+ - Run the script: `bash modubi`, this will start up Ubiquity.
+ - Install the distro, using the whole disk, and select ZFS in Advanced.
+ - Reboot into the new install.
+ - Download the script to encrypt the swap partition: `wget 4e4.win/encswap`.
+ - Run the script: `bash encswap`.
+
+## Rationale
+The `lmdescrypt` had a long run and has helped installing Ubuntu/Linuxmint on
+many incarnations of these distributions. It was always a fragile proposition
+that happened to work well. Now in 2020, the script need more work to get it
+to work properly. At the same time, ZFS rose in viability, and encrypted ZFS
+does now exist, and it is getting support from the OS (and systemd). This page
+https://openzfs.github.io/openzfs-docs/Getting%20Started/Ubuntu/Ubuntu%2020.04%20Root%20on%20ZFS.html convinced me that the time had come to switch my installs
+to Encrypted ZFS. Hence `modubi` and `encswap` to facilitate this type of
+install (ideally `encswap` would also be part of Ubiquity...).
+
+On the other hand, Ubiquity does now support Encrypted LVM2, so the need for
+`lmdescrypt` is diminished, even if the options are still limited.
+
 # lmdescrypt
 **version 0.991**
 
 * **Funtion**: This script installs Linux Mint Debian Edition (201403), LMDE2
 (201503 or 201701), LMDE3 (201808), LMDE4 (202004) or regular Linux Mint 17,
-17.1/2/3, 18, 18.1/2/3, 19, 20, or Ubuntu 18.04, either i686 or amd64, with
+17.1/2/3, 18, 18.1/2/3, 19, 20beta, or Ubuntu 18.04, either i686 or amd64, with
 MSDOS or GPT partitions, with UEFI or not.
 * **Result**: a fully LUKS encrypted system, with LVM2 volumes of root and
 swap (and optionally: data) with optional boot partition
 (with optional boot-from-iso-file).
-* Download shortlink for the script: http://4e4.win/lmdescrypt
+* Download shortlink for the script: https://4e4.win/lmdescrypt
 * Tutorial on Linux Mint community: https://community.linuxmint.com/tutorial/view/2265
 * Gitlab page: https://gitlab.com/pepa65/lmdescrypt
 * Questions?  pepa65@passchier.net or post an Issue on the gitlab page
