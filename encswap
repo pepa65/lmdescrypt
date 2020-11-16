@@ -3,34 +3,38 @@
 # Usage: encswap [<swapdevice>]
 # Required: mount(swapon swapoff) coreutils(ls head) grep sed wget apt patch
 
+# Process commandline
 [[ $1 ]] && swapdev=$1 || swapdev=$(swapon --show=NAME --noheadings)
+
+# Handle swapfile
+[[ -f $swapdev ]] &&
+	echo 'A swapfile should just be on an encrypted fs' && exit 1
+
 swapdev=${swapdev#/} swapdev=${swapdev#dev/}
-swapid=$(ls -l /dev/disk/by-id |grep "/$swapdev$" |head -1 |cut -d' ' -f9)
-[[ -z $swapid ]] && echo "No swap device mounted or given" && exit 1
+swapid=$(ls -l /dev/disk/by-id |grep -o "[^ ]* -> \.\./\.\./$swapdev$" |
+	head -1 |cut -d' ' -f1)
+[[ -z $swapid ]] && echo "No swap device mounted or given" && exit 2
 id=/dev/disk/by-id/$swapid
 sudo swapoff /dev/$swapdev
 
 echo -e "\n=== Encrypting non-encrypted swap partition ===\n"
 
-sudo apt install cryptsetup
-
-# Patch systemd for Encrypted ZFS
-patch=launchpadlibrarian.net/478315221/2150-fix-systemd-dependency-loops.patch
-file1=/lib/systemd/system-generators/zfs-mount-generator
-[[ -f $file1 ]] && ! grep -q 'zpool list -H -o name' "$file1" &&
-	wget -qO- "https://$patch" |sed -e 's@/etc@/lib@' -e 's@\.in$@@' |
-		(cd /; sudo patch -p1)
+type -p cryptsetup >/dev/null || sudo apt install cryptsetup
 
 # Comment-out current swap line in /etc/fstab and append new one
-sudo sed -i "/^\/dev\/$swapdev /s/^/#/g" /etc/fstab
+sudo sed -i "/^\/dev\/$swapdev /s/^/#/" /etc/fstab
+swapuuid=$(blkid /dev/$swapdev --output=value --match-tag=UUID)
+sudo sed -i "/^UUID=$swapuuid/s/^/#/" /etc/fstab
 sudo sed -i "/^${id//\//\\/} /s/^/#/g" /etc/fstab
-add="/dev/mapper/swap encswap swap defaults 0 0"
-grep -q "^$add" /etc/fstab ||
+add="/dev/mapper/swap$swapdev encswap swap defaults 0 0"
+grep "^$add" /etc/fstab &>/dev/null ||
 	echo "$add" |sudo tee -a /etc/fstab
 
-# Append line to crypttab
-add="swap $id /dev/urandom swap,cipher=aes-xts-plain64:sha256,size=512"
-[[ -f /etc/crypttab ]] && ! grep -q "^$add" /etc/crypttab &&
+# Append line to crypttab if it isn't there yet
+add="swap$swapdev $id /dev/urandom swap,cipher=aes-xts-plain64:sha256,size=512"
+grep "^$add" /etc/crypttab &>/dev/null ||
 	echo "$add" |sudo tee -a /etc/crypttab
 
-echo "Reboot recommended to start using encrypted swap"
+echo 'Review the crypttab and fstab:'
+grep '^[^#]' /etc/crypttab /etc/fstab
+echo -e "\nReboot recommended to start using encrypted swap"

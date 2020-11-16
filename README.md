@@ -1,24 +1,25 @@
-# modubi / encswap
-**Run a modified Ubiquity installer to use encrypted ZFS**
+# zfse / encswap
+**Run a modified Ubiquity installer to use natively encrypted ZFS**
 * Usage:
- - Boot into a Ubuntu/Linuxmint Desktop installer.
- - In a terminal, download the script: `wget 4e4.win/modubi`.
- - Run the script: `bash modubi`, this will start up Ubiquity.
- - In the 'Installation type' screen choose 'Erase whole disk' and then click
-   on 'Advanced features...' and then 'EXPERIMENTAL: Erase disk and use ZFS'.
- - Reboot into the new install.
- - Download the script to encrypt the swap partition: `wget 4e4.win/encswap`.
- - Run the script: `bash encswap`.
+  - Boot into a Ubuntu/Linuxmint Desktop installer.
+  - In a terminal, download the script: `wget 4e4.win/zfse`.
+  - Run the script: `bash zfse` which will tweak and start up Ubiquity.
+  - In the 'Installation type' screen choose 'Erase whole disk' and then click
+    on 'Advanced features...' and then 'EXPERIMENTAL: Erase disk and use ZFS'.
+  - Reboot into the new install.
+  - Download the script to encrypt the swap partition: `wget 4e4.win/encswap`.
+  - Run the script: `bash encswap`.
 
 ## Rationale
-The `lmdescrypt` had a long run and has helped installing Ubuntu/Linuxmint on
-many incarnations of these distributions. It was always a fragile proposition
-that happened to work well. Now in 2020, the script need more work to get it
+The `lmdescrypt` had a long run and helped installing Ubuntu / Linux Mint on
+many incarnations of these distributions. It was always a fragile hack
+that happened to work well. Now in 2020, the script needs more work to get it
 to work properly. At the same time, ZFS rose in viability, and encrypted ZFS
-does now exist, and it is getting support from the OS (and systemd). This page
+does now exist, and it is getting support from the packagers. This page
 https://openzfs.github.io/openzfs-docs/Getting%20Started/Ubuntu/Ubuntu%2020.04%20Root%20on%20ZFS.html convinced me that the time had come to switch my installs
-to Encrypted ZFS. Hence `modubi` and `encswap` to facilitate this type of
-install (ideally `encswap` would also be part of Ubiquity...).
+to Encrypted ZFS. I used `zfse` and `encswap` to facilitate this type of
+install (ideally Ubiquity should support randomly encrypted swap, or even
+better, ZFS should support swap on zvols..!).
 
 On the other hand, Ubiquity does now support Encrypted LVM2, so the need for
 `lmdescrypt` is diminished, even if the options are still limited.
