@@ -4,19 +4,20 @@
 efisize=1536
 
 file=/usr/share/ubiquity/zsys-setup pw=
-[[ ! -f $file ]] && echo "Ubiquity not present" && exit 1
+[[ ! -f $file ]] && echo "Ubiquity installer not present" && exit 1
 
 # Get passphrase
-echo 'To abort, enter an empty password or do Ctrl_C.'
+echo -e '\n===  Modifying Ubiquity installer to use natively encrypted ZFS ==='
+echo -e '\n  To abort, enter an empty password or do Ctrl_C.\n'
 while [[ -z $pw ]]
 do
-	pw=$(systemd-ask-password 'Choose ZFS Encryption password:')
-	[[ -z $pw ]] && echo 'Aborted' && exit 2
-	((${#pw}<8)) && echo -e "Password must be at least 8 characters\n" &&
+	pw=$(systemd-ask-password '  Choose ZFS Encryption password:')
+	[[ -z $pw ]] && echo '  Aborted' && exit 2
+	((${#pw}<8)) && echo -e "  Password must be at least 8 characters\n" &&
 		pw= && continue
-	pw2=$(systemd-ask-password 'Confirm the entered password:')
-	[[ -z $pw2 ]] && echo 'Aborted' && exit 2
-	[[ ! $pw = $pw2 ]] && pw= && echo -e 'Passwords not the same. Again:\n'
+	pw2=$(systemd-ask-password '  Confirm the entered password:')
+	[[ -z $pw2 ]] && echo '  Aborted' && exit 2
+	[[ ! $pw = $pw2 ]] && pw= && echo -e '  Passwords not the same. Again:\n'
 done
 
 # For Linux Mint, especially zfsutils-linux seems to be required
@@ -36,35 +37,38 @@ sudo sed -i '/[^ ]-O/ s@-O sync=disabled @-O encryption=aes-256-gcm -O keylocati
 sudo sed -i "/[^1-9]512M,/ s@512M,@${efisize}M,@" "$file"
 
 # Remove EFI System Partition(s)
-parts=$(ls -Al /dev/disk/by-partuuid |grep -o '[a-z][a-z0-9]*$')
+parts=$(ls -Al /dev/disk/by-partuuid 2>/dev/null |grep -o '[a-z][a-z0-9]*$')
 for part in $parts
 do num=${part##*[a-z]} disk=${part%$num} dev=/dev/$disk$num
 	esp=$(sudo sgdisk -i$num /dev/$disk |
 		grep C12A7328-F81F-11D2-BA4B-00A0C93EC93B)
  	if [[ $esp ]]
 	then
-		echo "OK to wipe EFI System Partition $dev?"
-		read -p "Ctrl_C to abort, enter 'n' to skip wiping $dev, Enter to wipe "
-		[[ ! ${REPLY:0:1} = [nN] ]] && echo "Wiping $dev..." &&
+		echo -e "\n  OK to wipe EFI System Partition $dev?"
+		echo "  Ctrl_C to abort, enter 'n' to skip wiping $dev, Enter to wipe"
+		read
+		[[ ! ${REPLY:0:1} = [nN] ]] && echo "  Wiping $dev..." &&
 			sudo wipefs -a "$dev" && sudo partprobe "/dev/$disk"
 	fi
 done
 
-cat <<-EOM
-	The Ubiquity graphical installer will start next, go through its screens.
-	In its "Installation type" screen choose: "Erase disk and install ..."
-	and then click on "Advanced features" and select:
-	"EXPERIMENTAL: Erase disk and use ZFS" and click "OK" and then click
-	"Install Now". Follow the screens and the install will proceed.
+cat <<EOM
 
-	Ubiquity will then suggest to reboot. After rebooting, it is recommended to
-	encrypt the swap partition, which can be done by typing this into the
-	terminal:
+  The Ubiquity graphical installer will start next, go through its screens.
+  In its "Installation type" screen choose: "Erase disk and install ..."
+  and then click on "Advanced features" and select:
+  "EXPERIMENTAL: Erase disk and use ZFS" and click "OK" and then click
+  "Install Now". Follow the screens and the install will proceed.
 
-	  wget 4e4.win/encswap
-	  bash encswap
+  At the end, the installer will suggest to reboot. After rebooting,
+  it is recommended to encrypt the swap partition, which can be done by
+  typing this into the terminal:
 
+    wget 4e4.win/encswap
+    bash encswap
+
+  Ctrl_C to abort, Enter to start the Ubiquity installer
 EOM
-read -p 'Ctrl_C to abort, Enter to continue by running the Ubiquity installer '
+read
 
 ubiquity gtk_ui
