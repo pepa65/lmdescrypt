@@ -38,7 +38,7 @@ sudo sed -i "/[^1-9]512M,/ s@512M,@${efisize}M,@" "$file"
 # Encrypt swap partition
 #sudo sed -i "s#grep -Ev [^>]*@echo '/dev/mapper/cryptswap none swap sw 0 0' @" "$file"
 sudo sed -i '/tdiscard/ s@UUID=[^>]*@/dev/mapper/cryptswap cryptswap swap sw 0 0\\n" @' "$file"
-sudo sed -i '/swapon/ s@swapon.*$@echo "cryptswap /dev/sda2 /dev/urandom swap,cipher=aes-xts-plain64,size=256" >>/etc/crypttab@' "$file"
+sudo sed -i '/swapon/ s@swapon.*$@echo "cryptswap /dev/sda2 /dev/urandom swap,cipher=aes-xts-plain64,size=256" >>$TARGET/etc/crypttab@' "$file"
 
 # Remove EFI System Partition(s)
 parts=$(ls -Al /dev/disk/by-partuuid 2>/dev/null |grep -o '[a-z][a-z0-9]*$')
@@ -46,12 +46,12 @@ for part in $parts
 do num=${part##*[a-z]} disk=${part%$num} dev=/dev/$disk$num
 	esp=$(sudo sgdisk -i$num /dev/$disk |
 		grep C12A7328-F81F-11D2-BA4B-00A0C93EC93B)
- 	if [[ $esp ]]
+	if [[ $esp ]]
 	then
 		echo -e "\n  OK to wipe EFI System Partition $dev?\n"
-		echo "  (Ctrl_C to abort, N to keep, Enter to wipe)"
+		echo "  (Ctrl_C to abort, K to keep, Enter to wipe)"
 		read -n1
-		[[ -z $REPLY = [nN] ]] && echo "  Wiping $dev..." &&
+		[[ -z $REPLY ]] && echo "  Wiping $dev..." &&
 			sudo wipefs -a "$dev" && sudo partprobe "/dev/$disk"
 	fi
 done
